@@ -1,0 +1,299 @@
+/* ============================================================
+   STARFIGHTER — Stylesheet (UI-Overlays, HUD-Rahmen, Screens)
+   ============================================================ */
+
+:root {
+  --bg: #05070f;
+  --panel: rgba(10, 16, 34, 0.92);
+  --panel-border: rgba(90, 180, 255, 0.35);
+  --accent: #46c8ff;
+  --accent2: #ff9d2e;
+  --text: #dfeaff;
+  --dim: #7d8db0;
+  --danger: #ff4d6a;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+
+#game {
+  display: block;
+  touch-action: none;
+}
+
+/* ---------- generische Overlay-Screens ---------- */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  z-index: 20;
+  background: radial-gradient(ellipse at 50% 30%, rgba(10, 20, 50, 0.55), rgba(3, 5, 12, 0.88));
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  text-align: center;
+}
+
+.screen.hidden { display: none; }
+
+.logo {
+  font-size: clamp(38px, 11vw, 64px);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  background: linear-gradient(180deg, #aee6ff 0%, #46c8ff 45%, #1e6dff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 18px rgba(70, 200, 255, 0.45));
+  text-transform: uppercase;
+}
+
+.tagline {
+  color: var(--dim);
+  font-size: 14px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  margin-top: -10px;
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(320px, 84vw);
+  margin-top: 10px;
+}
+
+button {
+  font: inherit;
+  color: var(--text);
+  background: linear-gradient(180deg, rgba(40, 70, 130, 0.85), rgba(18, 32, 66, 0.9));
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: transform 0.06s ease, box-shadow 0.15s ease;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+button:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+button.primary {
+  background: linear-gradient(180deg, #2fa8e8, #1560c8);
+  border-color: rgba(160, 220, 255, 0.55);
+  box-shadow: 0 4px 22px rgba(40, 140, 255, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  font-size: 19px;
+}
+
+button.small {
+  padding: 9px 14px;
+  font-size: 14px;
+  border-radius: 9px;
+}
+
+/* ---------- Panels (Optionen, Hilfe, Bestenliste) ---------- */
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  padding: 20px 22px;
+  width: min(360px, 90vw);
+  max-height: 78vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  text-align: left;
+}
+
+.panel h2 {
+  font-size: 20px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.opt-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(120, 150, 200, 0.12);
+}
+
+.opt-row:last-of-type { border-bottom: none; }
+
+.opt-row .label { font-size: 15px; font-weight: 600; }
+.opt-row .sub { display: block; font-size: 12px; color: var(--dim); font-weight: 400; margin-top: 2px; }
+
+.toggle {
+  min-width: 96px;
+  text-align: center;
+  padding: 8px 12px;
+  font-size: 14px;
+  border-radius: 999px;
+}
+
+.toggle.on {
+  background: linear-gradient(180deg, #2fa8e8, #1560c8);
+  border-color: rgba(160, 220, 255, 0.6);
+}
+
+.toggle.retro {
+  background: linear-gradient(180deg, #7a4fd8, #4a2a99);
+  border-color: rgba(200, 160, 255, 0.6);
+  font-family: "Courier New", monospace;
+  letter-spacing: 0.02em;
+}
+
+/* ---------- Hilfe ---------- */
+
+.help-list { list-style: none; font-size: 14px; line-height: 1.55; }
+.help-list li { padding: 6px 0; border-bottom: 1px solid rgba(120, 150, 200, 0.1); }
+.help-list li:last-child { border-bottom: none; }
+.help-list b { color: var(--accent); }
+.help-list .pw { color: var(--accent2); font-weight: 700; }
+
+/* ---------- Bestenliste ---------- */
+
+.score-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-table td {
+  padding: 7px 6px;
+  border-bottom: 1px solid rgba(120, 150, 200, 0.12);
+  white-space: nowrap;
+}
+
+.score-table td.rank { color: var(--dim); width: 2.2em; }
+.score-table td.name { overflow: hidden; text-overflow: ellipsis; max-width: 9em; }
+.score-table td.pts { text-align: right; font-weight: 700; color: var(--accent); }
+.score-table td.stg { text-align: right; color: var(--dim); width: 3.5em; font-size: 12px; }
+.score-table tr.you td { color: #ffe066; }
+.score-table tr.you td.pts { color: #ffe066; }
+.score-table tr.you { animation: blinkRow 0.9s steps(2) infinite; }
+
+@keyframes blinkRow { 50% { opacity: 0.45; } }
+
+.empty-note { color: var(--dim); text-align: center; padding: 18px 0; font-size: 14px; }
+
+/* ---------- Game Over / Namenseingabe ---------- */
+
+.big-score {
+  font-size: 40px;
+  font-weight: 900;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  filter: drop-shadow(0 0 14px rgba(70, 200, 255, 0.5));
+}
+
+.gameover-title {
+  font-size: clamp(30px, 9vw, 46px);
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: var(--danger);
+  text-transform: uppercase;
+  filter: drop-shadow(0 0 16px rgba(255, 77, 106, 0.5));
+}
+
+.newrecord {
+  color: #ffe066;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  animation: blinkRow 0.8s steps(2) infinite;
+}
+
+#nameInput {
+  font: inherit;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: rgba(8, 14, 30, 0.9);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 12px;
+  width: min(280px, 80vw);
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* ---------- In-Game-Buttons ---------- */
+
+#pauseBtn {
+  position: fixed;
+  top: calc(10px + env(safe-area-inset-top));
+  right: calc(10px + env(safe-area-inset-right));
+  z-index: 15;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 18px;
+  border-radius: 12px;
+  opacity: 0.75;
+  display: none;
+}
+
+#pauseBtn.visible { display: block; }
+
+.stat-line { color: var(--dim); font-size: 14px; }
+.stat-line b { color: var(--text); }
+
+.footer-note {
+  position: fixed;
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  left: 0; right: 0;
+  text-align: center;
+  color: rgba(125, 141, 176, 0.55);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  z-index: 21;
+  pointer-events: none;
+}

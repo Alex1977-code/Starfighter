@@ -31,7 +31,9 @@ const DIFF_PRESETS = {
   hard:   { letter: 'S', shield: 2, lives: 3, ramp: 1.35, bulletF: 1.18, spawnF: 0.82, scoreMult: 1.4 },
 };
 
-const RETRO_F = 3;   // Pixelfaktor im Retro-Grafikmodus
+/* Pixelfaktor im Retro-Grafikmodus: 2 → interne Auflösung 240×400,
+   deckungsgleich mit dem Pixelraster der Sprites (Scale 2) */
+const RETRO_F = 2;
 
 /* ============================================================ */
 
@@ -58,6 +60,7 @@ class Game {
     this.lowCanvas.width = Math.ceil(W / RETRO_F);
     this.lowCanvas.height = Math.ceil(H / RETRO_F);
     this.lowCtx = this.lowCanvas.getContext('2d');
+    this.lowCtx.imageSmoothingEnabled = false;
     this.scanPattern = null;
 
     Sound.setMode(this.settings.soundMode);
@@ -110,6 +113,7 @@ class Game {
     this.powerups = [];
     this.particles = [];
     this.shocks = [];
+    this.explosions = [];
     this.floats = [];
     this.boss = null;
 
@@ -516,7 +520,8 @@ class Game {
   }
 
   onAirKill(e) {
-    spawnExplosion(this, e.x, e.y, { count: 20 });
+    spawnExplosion(this, e.x, e.y, { count: 14 });
+    this.explosions.push(new BoomAnim(e.x, e.y, 2.4));
     this.shocks.push(new Shockwave(e.x, e.y, 34));
     Sound.sfx('expl');
     this.addScore(this.pts(e.score), e.x, e.y);
@@ -544,7 +549,8 @@ class Game {
   }
 
   onGroundKill(g) {
-    spawnExplosion(this, g.x, g.y, { count: 26, maxSize: 8, colors: ['#ffd166', '#ff7b33', '#ff4d2e', '#ffe9b0'] });
+    spawnExplosion(this, g.x, g.y, { count: 18, maxSize: 8, colors: ['#ffd166', '#ff7b33', '#ff4d2e', '#ffe9b0'] });
+    this.explosions.push(new BoomAnim(g.x, g.y, 3));
     this.chain = Math.min(8, this.chain + 1);
     this.chainTimer = 6;
     const mult = this.chain;
@@ -572,7 +578,8 @@ class Game {
 
   bombImpact(x, y) {
     const r = this.player.bombRadius;
-    spawnExplosion(this, x, y, { count: 30, speed: 240, maxSize: 9, lifeScale: 1.2 });
+    spawnExplosion(this, x, y, { count: 22, speed: 240, maxSize: 9, lifeScale: 1.2 });
+    this.explosions.push(new BoomAnim(x, y, 3.4));
     this.shocks.push(new Shockwave(x, y, r * 1.5, '255,180,90'));
     Sound.sfx('gexpl');
     this.shake(5, 0.2);
@@ -632,6 +639,7 @@ class Game {
     this.deathTimer = 1.7;
     this.lives--;
     spawnExplosion(this, p.x, p.y, { count: 44, speed: 280, maxSize: 10, lifeScale: 1.4 });
+    this.explosions.push(new BoomAnim(p.x, p.y, 3.6));
     this.shocks.push(new Shockwave(p.x, p.y, 74, '140,210,255'));
     Sound.sfx('pdie');
     this.shake(12, 0.6);
@@ -803,6 +811,7 @@ class Game {
   updateLists(dt) {
     this.particles = this.particles.filter(pt => pt.update(dt));
     this.shocks = this.shocks.filter(s => s.update(dt));
+    this.explosions = this.explosions.filter(b => b.update(dt));
     this.floats = this.floats.filter(f => f.update(dt));
   }
 
@@ -926,6 +935,7 @@ class Game {
   draw() {
     const ctx = this.ctx;
     const retro = this.settings.gfx === 'retro';
+    SpriteGfx.snap = retro;   // Sprites im Retro-Modus aufs Pixelraster rasten
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
     if (!retro) {
@@ -994,6 +1004,9 @@ class Game {
       }
     }
 
+    // klassische Explosions-Frames über allem
+    for (const b of this.explosions) b.draw(ctx);
+
     // Partikel & Schockwellen: Glow additiv, Rauch normal
     ctx.globalCompositeOperation = 'lighter';
     for (const s of this.shocks) s.draw(ctx);
@@ -1039,7 +1052,7 @@ class Game {
       pc.width = 1;
       pc.height = RETRO_F;
       const px = pc.getContext('2d');
-      px.fillStyle = 'rgba(0,0,0,0.24)';
+      px.fillStyle = 'rgba(0,0,0,0.18)';
       px.fillRect(0, RETRO_F - 1, 1, 1);
       this.scanPattern = ctx.createPattern(pc, 'repeat');
     }
@@ -1048,19 +1061,29 @@ class Game {
   }
 
   drawHUD(ctx) {
-    ctx.font = "bold 20px 'Segoe UI', sans-serif";
+    // klassisches Arcade-Layout: 1UP / HI-SCORE als rote Labels
+    const mono = "bold 11px 'Courier New', monospace";
+    ctx.font = mono;
     ctx.textAlign = 'left';
+    if (Math.floor(this.time * 2) % 2 === 0) {
+      ctx.fillStyle = '#ff5a5a';
+      ctx.fillText('1UP', 14, 20);
+    }
+    ctx.font = "bold 19px 'Segoe UI', sans-serif";
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.fillText(this.score.toLocaleString('de-DE'), 14, 30);
+    ctx.fillText(this.score.toLocaleString('de-DE'), 14, 40);
     ctx.fillStyle = '#dfeaff';
-    ctx.fillText(this.score.toLocaleString('de-DE'), 13, 29);
+    ctx.fillText(this.score.toLocaleString('de-DE'), 13, 39);
 
     const scores = this.cachedScores || (this.cachedScores = loadJSON(LS_SCORES, []));
     const hi = Math.max(scores.length ? scores[0].score : 0, this.score);
-    ctx.font = "12px 'Segoe UI', sans-serif";
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#7d8db0';
-    ctx.fillText(`REKORD ${hi.toLocaleString('de-DE')}`, W / 2, 24);
+    ctx.font = mono;
+    ctx.fillStyle = '#ff5a5a';
+    ctx.fillText('HI-SCORE', W / 2, 20);
+    ctx.font = "bold 14px 'Segoe UI', sans-serif";
+    ctx.fillStyle = '#dfeaff';
+    ctx.fillText(hi.toLocaleString('de-DE'), W / 2, 38);
 
     ctx.textAlign = 'right';
     ctx.fillStyle = '#9fb4dd';

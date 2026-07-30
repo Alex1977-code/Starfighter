@@ -177,6 +177,29 @@ class Terrain {
           ctx.arc(x * TILE + 10 + (vars[x] & 2) * 3, y + 12, 8, 0, 6.3);
           ctx.arc(x * TILE + 22, y + 22, 7, 0, 6.3);
           ctx.fill();
+          // Glanzlicht auf der Baumkrone
+          ctx.fillStyle = 'rgba(160,220,120,0.35)';
+          ctx.fillRect(x * TILE + 7 + (vars[x] & 2) * 3, y + 8, 4, 2);
+          ctx.fillRect(x * TILE + 19, y + 18, 3, 2);
+        } else if (t === T_GRASS || t === T_GRASS2) {
+          // Grasbüschel als Sprenkel
+          const hh = this._hash(x * 3 + 2, row.gy);
+          if (hh > 0.62) {
+            ctx.fillStyle = 'rgba(16,50,22,0.5)';
+            const gx = x * TILE + 4 + (vars[x] * 6) % 20;
+            const gy2 = y + 5 + ((vars[x] * 11) % 18);
+            ctx.fillRect(gx, gy2, 2, 4);
+            ctx.fillRect(gx + 5, gy2 + 6, 2, 3);
+            if (hh > 0.85) ctx.fillRect(gx + 10, gy2 + 2, 2, 4);
+          }
+        } else if (t === T_SAND) {
+          // Dünen-Wellenlinien
+          if (this._hash(x * 5 + 7, row.gy) > 0.68) {
+            ctx.fillStyle = 'rgba(90,66,30,0.28)';
+            const dy2 = y + 8 + (vars[x] * 5) % 16;
+            ctx.fillRect(x * TILE + 3, dy2, 12, 2);
+            ctx.fillRect(x * TILE + 13, dy2 + 2, 10, 2);
+          }
         } else if (t === T_WATER || t === T_DEEP) {
           const ph = ((row.gy * 13 + x * 7) % 32 + time * 26) % 32;
           ctx.fillStyle = 'rgba(180,220,255,0.10)';

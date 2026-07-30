@@ -1,0 +1,125 @@
+# 🚀 Starfighter
+
+**Ein moderner Arcade-Shooter für das Handy** – eine Neuauflage im Geist der
+klassischen Vertikal-Scroller der 80er (Xevious lässt grüßen), gebaut als
+installierbare Web-App (PWA). Läuft in jedem modernen Browser, offline, ohne
+Installation aus einem App-Store.
+
+![Starfighter](icons/icon-192.png)
+
+## Sofort spielen
+
+Das Spiel ist eine statische Web-App – einfach hosten und loslegen:
+
+```bash
+# lokal testen:
+python3 -m http.server 8000
+# dann http://localhost:8000 öffnen
+```
+
+Für das echte Handy-Erlebnis die Seite über **GitHub Pages** (oder einen
+beliebigen Webserver mit HTTPS) bereitstellen, auf dem Handy öffnen und über
+**„Zum Startbildschirm hinzufügen"** installieren – dann startet Starfighter
+im Vollbild und funktioniert komplett offline.
+
+> GitHub Pages aktivieren: *Settings → Pages → Deploy from branch* auswählen.
+
+## Das Spiel
+
+Du fliegst über eine endlos scrollende Welt aus Wiesen, Wäldern, Ozeanen,
+Wüsten und feindlichen Tech-Basen. Wie beim großen Vorbild gibt es **zwei
+Waffensysteme**:
+
+- die **Bordkanone** gegen Luftziele (feuert automatisch)
+- **Bomben** gegen Bodenziele – ein Fadenkreuz fliegt vor dem Schiff her,
+  Ziele darin werden automatisch bombardiert
+
+Alle 60–70 Sekunden wartet ein **Mutterschiff-Boss**: erst die vier Türme
+knacken, dann den freigelegten Kern zerstören.
+
+### Steuerung (bewusst einfach)
+
+| Aktion | Handy | Desktop |
+|---|---|---|
+| Bewegen | Finger irgendwo hinlegen und ziehen | Pfeiltasten / WASD |
+| Schießen | automatisch | automatisch |
+| Bombardieren | automatisch (Ziel im Fadenkreuz) | automatisch |
+| Pause | ⏸-Knopf | P oder Esc |
+
+### Punkte & Kette
+
+Bodenziele ohne Fehlwurf hintereinander zerstören lässt den
+**Ketten-Multiplikator bis ×8** steigen. Ein Bombentreffer ins Leere setzt
+die Kette zurück. Extraleben gibt es ab 30.000 Punkten, danach alle 50.000.
+
+### Power-ups
+
+| Symbol | Wirkung |
+|---|---|
+| **S** | Fächerfeuer (bis zu 5 Schüsse) |
+| **R** | höhere Feuerrate |
+| **E** | Schild komplett auffüllen |
+| **D** | Begleit-Drohne (max. 2) |
+| **B** | Mega-Bomben mit größerem Radius |
+| **1UP** | Extraleben |
+
+## Was gegenüber dem Original verbessert wurde
+
+Die Klassiker von damals hatten bekannte Schwächen – hier wurden sie gezielt
+angegangen, Ziel: **maximaler Spielspaß statt maximaler Frust**:
+
+| Kritik damals | Lösung in Starfighter |
+|---|---|
+| Ein Treffer = sofort tot | **Schild mit 3 Zellen**, erst danach kostet es ein Leben |
+| Träges Schiff | Direkte 1:1-Touch-Steuerung, Empfindlichkeit einstellbar |
+| Keine Power-ups, kaum Progression | 6 Power-up-Typen, Drohnen, Waffenstufen |
+| Bomben-Zielen fummelig | **Auto-Bombardierung** mit sichtbarem Ziel-Lock |
+| Monotone Landschaft | 5 wechselnde Biome, Fluss, Straßen, Wolken-Parallax |
+| Brutale Schwierigkeitssprünge | Sanft ansteigende Schwierigkeit, faire kleine Hitbox, kurze Unverwundbarkeit nach Treffern |
+| Verlust von allem beim Tod | Beim Respawn bleibt fast alles erhalten (nur eine Fächerstufe geht verloren) |
+| Repetitiver Sound | Eigener Soundtrack + Boss-Musik, komplett synthetisiert |
+
+## Sound: Modern ↔ 8-Bit
+
+In den **Optionen** lässt sich der komplette Klang jederzeit umschalten:
+
+- **Modern**: fette Sägezahn-Synths, Sub-Bass, Filter-Sweeps, Delay-Raum
+- **8-Bit**: originalgetreuer Chiptune-Klang – Rechteck- und Dreieckwellen,
+  LoFi-Rauschen wie aus dem Automaten
+
+Beides wird zur Laufzeit per WebAudio synthetisiert – das Spiel enthält
+**keine einzige Audiodatei** (und keine urheberrechtlich geschützten Klänge).
+
+## Bestenliste
+
+Nach jeder Runde, die es in die Top 10 schafft: **Namen eingeben** und
+verewigen. Die Liste (Top 10 mit Name, Punkten und erreichter Stufe) wird
+lokal auf dem Gerät gespeichert.
+
+## Technik
+
+- **Kein Framework, keine Assets, keine Abhängigkeiten** – pures
+  HTML5-Canvas, Vanilla JS und WebAudio (~2.500 Zeilen)
+- Prozedural generiertes Terrain, alle Sprites als Vektor-Rendering mit
+  Glow-/Partikeleffekten, Screenshake, additivem Blending
+- **PWA**: Manifest + Service Worker → offline spielbar, installierbar
+- Läuft mit 60 FPS auch auf älteren Geräten (logische Auflösung 480×800,
+  DPI-scharf skaliert)
+
+```
+index.html          Einstiegspunkt & UI-Screens (Deutsch)
+style.css           UI-Design
+js/audio.js         Sound-Engine (Modern/8-Bit, Musik-Sequencer, SFX)
+js/terrain.js       prozedurales Scroll-Terrain mit Biomen
+js/entities.js      Spieler, Gegner, Boss, Projektile, Power-ups, Partikel
+js/game.js          Spielschleife, Wellen-Direktor, Kollisionen, HUD, Screens
+sw.js               Service Worker (Offline-Cache)
+manifest.webmanifest PWA-Manifest
+tools/gen_icons.py  erzeugt die App-Icons (pures Python, keine Dependencies)
+```
+
+## Lizenz
+
+MIT – siehe [LICENSE](LICENSE). Alle Grafiken und Sounds werden prozedural
+erzeugt; das Spiel ist eine eigenständige Hommage an das Genre und verwendet
+keinerlei Original-Assets.

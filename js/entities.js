@@ -67,6 +67,24 @@ class Shockwave {
   }
 }
 
+/* klassische 4-Frame-Arcade-Explosion */
+class BoomAnim {
+  constructor(x, y, scale) {
+    this.x = x; this.y = y;
+    this.scale = scale || 2.5;
+    this.t = 0;
+    this.dur = 0.4;
+  }
+  update(dt) {
+    this.t += dt;
+    return this.t < this.dur;
+  }
+  draw(ctx) {
+    const i = Math.min(3, Math.floor(this.t / this.dur * 4));
+    drawSprite(ctx, SPRITES.boom[i], this.x, this.y, { scale: this.scale });
+  }
+}
+
 class FloatText {
   constructor(x, y, text, color, big) {
     this.x = x; this.y = y; this.text = text;
@@ -296,19 +314,13 @@ class Player {
     const blink = this.invuln > 0 && Math.floor(this.t * 14) % 2 === 0;
     if (blink) ctx.globalAlpha = 0.35;
 
-    // Drohnen
+    // Begleit-Drohnen
     for (let i = 0; i < this.drones; i++) {
       const off = i === 0 ? -34 : 34;
       const bob = Math.sin(this.t * 5 + i * 3) * 3;
-      ctx.save();
-      ctx.translate(this.x + off, this.y + 4 + bob);
-      ctx.fillStyle = 'rgba(90,200,255,0.25)';
-      ctx.beginPath(); ctx.arc(0, 0, 11, 0, 6.3); ctx.fill();
-      ctx.fillStyle = '#bfe9ff';
-      ctx.beginPath();
-      ctx.moveTo(0, -8); ctx.lineTo(6, 5); ctx.lineTo(0, 2); ctx.lineTo(-6, 5);
-      ctx.closePath(); ctx.fill();
-      ctx.restore();
+      ctx.fillStyle = 'rgba(90,200,255,0.22)';
+      ctx.beginPath(); ctx.arc(this.x + off, this.y + 4 + bob, 11, 0, 6.3); ctx.fill();
+      drawSprite(ctx, SPRITES.droneBuddy, this.x + off, this.y + 4 + bob);
     }
 
     ctx.save();
@@ -317,51 +329,16 @@ class Player {
 
     // Triebwerksflamme
     const fl = 10 + Math.sin(this.t * 40) * 3;
-    const fg = ctx.createLinearGradient(0, 14, 0, 14 + fl + 12);
+    const fg = ctx.createLinearGradient(0, 16, 0, 16 + fl + 12);
     fg.addColorStop(0, 'rgba(160,230,255,0.95)');
     fg.addColorStop(0.5, 'rgba(60,140,255,0.6)');
     fg.addColorStop(1, 'rgba(60,140,255,0)');
     ctx.fillStyle = fg;
     ctx.beginPath();
-    ctx.moveTo(-5, 14); ctx.lineTo(5, 14); ctx.lineTo(0, 14 + fl + 12);
+    ctx.moveTo(-5, 16); ctx.lineTo(5, 16); ctx.lineTo(0, 16 + fl + 12);
     ctx.closePath(); ctx.fill();
 
-    // Rumpf
-    const body = ctx.createLinearGradient(0, -24, 0, 18);
-    body.addColorStop(0, '#f2f7ff');
-    body.addColorStop(0.55, '#b9c8e2');
-    body.addColorStop(1, '#7c8cad');
-    ctx.fillStyle = body;
-    ctx.beginPath();
-    ctx.moveTo(0, -24);
-    ctx.lineTo(7, -4);
-    ctx.lineTo(24, 10);
-    ctx.lineTo(24, 15);
-    ctx.lineTo(8, 12);
-    ctx.lineTo(5, 17);
-    ctx.lineTo(-5, 17);
-    ctx.lineTo(-8, 12);
-    ctx.lineTo(-24, 15);
-    ctx.lineTo(-24, 10);
-    ctx.lineTo(-7, -4);
-    ctx.closePath();
-    ctx.fill();
-
-    // Flügelspitzen-Akzente
-    ctx.fillStyle = '#ff9d2e';
-    ctx.fillRect(-24, 10, 4, 5);
-    ctx.fillRect(20, 10, 4, 5);
-
-    // Cockpit
-    ctx.fillStyle = '#39d5ff';
-    ctx.beginPath();
-    ctx.ellipse(0, -8, 3.4, 7, 0, 0, 6.3);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.beginPath();
-    ctx.ellipse(-1, -11, 1.2, 2.6, 0, 0, 6.3);
-    ctx.fill();
-
+    drawSprite(ctx, SPRITES.player, 0, 0);
     ctx.restore();
 
     // Schildring
@@ -432,15 +409,10 @@ class AirEnemy {
     if (this.flash > 0) this.flash -= dt;
     if (this.y > 850 || this.x < -60 || this.x > 540) this.alive = false;
   }
-  preDraw(ctx) {
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    if (this.flash > 0) {
-      ctx.shadowColor = '#ffffff';
-      ctx.shadowBlur = 14;
-    }
+  /* Sprite mit Treffer-Blitz zeichnen */
+  sprite(ctx, spr, rot) {
+    drawSprite(ctx, spr, this.x, this.y, { rot, flash: this.flash > 0 ? this.flash + 0.04 : 0 });
   }
-  postDraw(ctx) { ctx.restore(); }
 }
 
 /* Zickzack-Drohne — Kanonenfutter in Formationen */
@@ -457,15 +429,8 @@ class Drone extends AirEnemy {
     this.x += Math.sin(this.t * 3.2 + this.phase) * 95 * dt;
   }
   draw(ctx) {
-    this.preDraw(ctx);
-    ctx.rotate(Math.sin(this.t * 3.2 + this.phase) * 0.25);
-    ctx.fillStyle = '#c33f6e';
-    ctx.beginPath();
-    ctx.moveTo(0, 12); ctx.lineTo(12, -6); ctx.lineTo(0, -2); ctx.lineTo(-12, -6);
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#ff8fb3';
-    ctx.beginPath(); ctx.arc(0, 2, 4, 0, 6.3); ctx.fill();
-    this.postDraw(ctx);
+    // rotierender Ring wie die klassischen Toroid-Formationen
+    this.sprite(ctx, SPRITES.drone, this.t * 3 + this.phase);
   }
 }
 
@@ -490,15 +455,7 @@ class Swooper extends AirEnemy {
     }
   }
   draw(ctx) {
-    this.preDraw(ctx);
-    ctx.rotate((this.fromLeft ? 1 : -1) * 1.35);
-    ctx.fillStyle = '#d95f2b';
-    ctx.beginPath();
-    ctx.moveTo(0, -14); ctx.lineTo(9, 4); ctx.lineTo(0, 14); ctx.lineTo(-9, 4);
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#ffd166';
-    ctx.beginPath(); ctx.arc(0, 0, 3.5, 0, 6.3); ctx.fill();
-    this.postDraw(ctx);
+    this.sprite(ctx, SPRITES.swooper, (this.fromLeft ? 1 : -1) * 1.45);
   }
 }
 
@@ -534,15 +491,8 @@ class Diver extends AirEnemy {
     }
   }
   draw(ctx) {
-    this.preDraw(ctx);
-    ctx.rotate(this.state === 2 ? Math.atan2(this.vx, this.vy) * -1 : Math.sin(this.t * 8) * 0.2);
-    ctx.fillStyle = this.state === 2 ? '#ff4757' : '#b8405e';
-    ctx.beginPath();
-    ctx.moveTo(0, 13); ctx.lineTo(10, -9); ctx.lineTo(0, -4); ctx.lineTo(-10, -9);
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#ffe066';
-    ctx.beginPath(); ctx.arc(0, 4, 3, 0, 6.3); ctx.fill();
-    this.postDraw(ctx);
+    const rot = this.state === 2 ? -Math.atan2(this.vx, this.vy) : Math.sin(this.t * 8) * 0.2;
+    this.sprite(ctx, SPRITES.diver, rot);
   }
 }
 
@@ -568,18 +518,11 @@ class Gunner extends AirEnemy {
     }
   }
   draw(ctx) {
-    this.preDraw(ctx);
-    ctx.fillStyle = '#8a4bd6';
-    ctx.beginPath();
-    ctx.moveTo(0, -16); ctx.lineTo(14, -4); ctx.lineTo(17, 10);
-    ctx.lineTo(6, 14); ctx.lineTo(-6, 14); ctx.lineTo(-17, 10); ctx.lineTo(-14, -4);
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#c9a0ff';
-    ctx.fillRect(-9, -2, 18, 4);
+    this.sprite(ctx, SPRITES.gunner, Math.sin(this.t * 1.8) * 0.06);
+    // pulsierende Mündung
     const gl = 0.5 + 0.5 * Math.sin(this.t * 6);
-    ctx.fillStyle = `rgba(255,120,220,${0.4 + 0.5 * gl})`;
-    ctx.beginPath(); ctx.arc(0, 7, 4.5, 0, 6.3); ctx.fill();
-    this.postDraw(ctx);
+    ctx.fillStyle = `rgba(255,120,220,${0.35 + 0.5 * gl})`;
+    ctx.beginPath(); ctx.arc(this.x, this.y + 12, 4.5, 0, 6.3); ctx.fill();
   }
 }
 
@@ -610,20 +553,11 @@ class Spinner extends AirEnemy {
     }
   }
   draw(ctx) {
-    this.preDraw(ctx);
-    ctx.rotate(this.t * 4);
-    ctx.fillStyle = '#2fbf9f';
-    for (let i = 0; i < 3; i++) {
-      ctx.rotate(Math.PI * 2 / 3);
-      ctx.beginPath();
-      ctx.moveTo(0, -4); ctx.lineTo(16, -10); ctx.lineTo(16, -2);
-      ctx.closePath(); ctx.fill();
-    }
-    ctx.fillStyle = '#aef3e2';
-    ctx.beginPath(); ctx.arc(0, 0, 6, 0, 6.3); ctx.fill();
-    ctx.fillStyle = '#0d6653';
-    ctx.beginPath(); ctx.arc(0, 0, 3, 0, 6.3); ctx.fill();
-    this.postDraw(ctx);
+    // Glühen im Zentrum + rotierender Stern
+    const gl = 0.4 + 0.4 * Math.sin(this.t * 7);
+    ctx.fillStyle = `rgba(63,224,182,${gl * 0.4})`;
+    ctx.beginPath(); ctx.arc(this.x, this.y, 18, 0, 6.3); ctx.fill();
+    this.sprite(ctx, SPRITES.spinner, this.t * 4);
   }
 }
 
@@ -689,65 +623,61 @@ class GroundEnemy {
     }
   }
   draw(ctx) {
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    if (this.flash > 0) { ctx.shadowColor = '#fff'; ctx.shadowBlur = 12; }
+    const fl = this.flash > 0 ? this.flash + 0.04 : 0;
 
     // Bodenschatten macht klar: das ist ein Bodenziel
     ctx.fillStyle = 'rgba(0,0,0,0.30)';
     ctx.beginPath();
-    ctx.ellipse(3, 5, this.r + 3, this.r * 0.75, 0, 0, 6.3);
+    ctx.ellipse(this.x + 3, this.y + 5, this.r + 3, this.r * 0.75, 0, 0, 6.3);
     ctx.fill();
 
     switch (this.type) {
       case 'dome': {
-        ctx.fillStyle = '#5d6675';
-        ctx.beginPath(); ctx.arc(0, 0, 14, 0, 6.3); ctx.fill();
-        ctx.fillStyle = '#828da0';
-        ctx.beginPath(); ctx.arc(-3, -4, 9, 0, 6.3); ctx.fill();
+        drawSprite(ctx, SPRITES.dome, this.x, this.y, { flash: fl });
         const gl = 0.5 + 0.5 * Math.sin(this.t * 2.4);
         ctx.fillStyle = `rgba(255,90,90,${0.35 + 0.55 * gl})`;
-        ctx.beginPath(); ctx.arc(0, 0, 4, 0, 6.3); ctx.fill();
+        ctx.beginPath(); ctx.arc(this.x, this.y - 2, 3.5, 0, 6.3); ctx.fill();
         break;
       }
       case 'turret': {
-        ctx.fillStyle = '#4d5666';
-        ctx.beginPath(); ctx.arc(0, 0, 15, 0, 6.3); ctx.fill();
-        ctx.fillStyle = '#6c7788';
-        ctx.beginPath(); ctx.arc(0, 0, 10, 0, 6.3); ctx.fill();
-        ctx.strokeStyle = '#39404d';
+        drawSprite(ctx, SPRITES.turretBase, this.x, this.y, { flash: fl });
+        ctx.strokeStyle = '#2a3140';
         ctx.lineWidth = 5;
         ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(Math.cos(this.aim) * 19, Math.sin(this.aim) * 19);
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x + Math.cos(this.aim) * 19, this.y + Math.sin(this.aim) * 19);
+        ctx.stroke();
+        ctx.strokeStyle = '#8fa2c4';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.x + Math.cos(this.aim) * 6, this.y + Math.sin(this.aim) * 6);
+        ctx.lineTo(this.x + Math.cos(this.aim) * 17, this.y + Math.sin(this.aim) * 17);
         ctx.stroke();
         ctx.lineWidth = 1;
         ctx.fillStyle = '#ff6b5c';
-        ctx.beginPath(); ctx.arc(0, 0, 4.5, 0, 6.3); ctx.fill();
+        ctx.beginPath(); ctx.arc(this.x, this.y, 4, 0, 6.3); ctx.fill();
         break;
       }
       case 'tank': {
-        ctx.rotate(this.dir > 0 ? 0.05 : -0.05);
-        ctx.fillStyle = '#57604f';
-        ctx.fillRect(-14, -10, 28, 20);
-        ctx.fillStyle = '#3c452f';
-        ctx.fillRect(-16, -12, 6, 24);
-        ctx.fillRect(10, -12, 6, 24);
-        ctx.fillStyle = '#707a63';
-        ctx.beginPath(); ctx.arc(0, 0, 7, 0, 6.3); ctx.fill();
-        ctx.strokeStyle = '#39402f';
+        // Wanne quer zur Fahrtrichtung
+        drawSprite(ctx, SPRITES.tank, this.x, this.y, {
+          rot: this.dir > 0 ? Math.PI / 2 : -Math.PI / 2, flash: fl,
+        });
+        ctx.strokeStyle = '#2c3322';
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(Math.cos(this.aim) * 16, Math.sin(this.aim) * 16);
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x + Math.cos(this.aim) * 16, this.y + Math.sin(this.aim) * 16);
         ctx.stroke();
         ctx.lineWidth = 1;
+        ctx.fillStyle = '#93b04f';
+        ctx.beginPath(); ctx.arc(this.x, this.y, 4.5, 0, 6.3); ctx.fill();
         break;
       }
       case 'radar': {
-        ctx.fillStyle = '#4d5666';
-        ctx.beginPath(); ctx.arc(0, 2, 12, 0, 6.3); ctx.fill();
+        drawSprite(ctx, SPRITES.radarBase, this.x, this.y, { flash: fl });
         ctx.save();
+        ctx.translate(this.x, this.y - 2);
         ctx.rotate(this.t * 1.8);
         ctx.strokeStyle = '#9fd8ff';
         ctx.lineWidth = 3;
@@ -760,11 +690,10 @@ class GroundEnemy {
         ctx.restore();
         const gl = 0.5 + 0.5 * Math.sin(this.t * 5);
         ctx.fillStyle = `rgba(120,220,255,${0.4 + 0.5 * gl})`;
-        ctx.beginPath(); ctx.arc(0, 2, 3.5, 0, 6.3); ctx.fill();
+        ctx.beginPath(); ctx.arc(this.x, this.y - 2, 3.5, 0, 6.3); ctx.fill();
         break;
       }
     }
-    ctx.restore();
   }
 }
 
@@ -800,7 +729,9 @@ class Boss {
     if (this.dying > 0) {
       this.dying -= dt;
       if (Math.random() < dt * 24) {
-        spawnExplosion(game, this.x + rand(-90, 90), this.y + rand(-30, 50), { count: 14 });
+        const ex = this.x + rand(-90, 90), ey = this.y + rand(-30, 50);
+        spawnExplosion(game, ex, ey, { count: 10 });
+        game.explosions.push(new BoomAnim(ex, ey, rand(2, 3.4)));
         game.sound.sfx('expl');
       }
       if (this.dying <= 0) {
@@ -859,7 +790,8 @@ class Boss {
         pod.flash = 0.08;
         if (pod.hp <= 0) {
           pod.alive = false;
-          spawnExplosion(game, this.x + pod.off, this.podY, { count: 20 });
+          spawnExplosion(game, this.x + pod.off, this.podY, { count: 16 });
+          game.explosions.push(new BoomAnim(this.x + pod.off, this.podY, 2.6));
           game.shocks.push(new Shockwave(this.x + pod.off, this.podY, 40));
           game.sound.sfx('expl');
           game.addScore(game.pts(400), this.x + pod.off, this.podY);
@@ -897,51 +829,22 @@ class Boss {
     const wob = Math.sin(this.t * 1.1) * 0.02;
     ctx.rotate(wob);
 
-    // Rumpf
-    const g = ctx.createLinearGradient(0, -50, 0, 50);
-    g.addColorStop(0, '#5a6478');
-    g.addColorStop(0.5, '#3d4557');
-    g.addColorStop(1, '#262c3a');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.moveTo(-100, 10);
-    ctx.lineTo(-64, -38);
-    ctx.lineTo(64, -38);
-    ctx.lineTo(100, 10);
-    ctx.lineTo(64, 44);
-    ctx.lineTo(-64, 44);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(130,170,220,0.35)';
-    ctx.stroke();
+    // Rumpf (Pixel-Schlachtschiff, Scale 3)
+    drawSprite(ctx, SPRITES.boss, 0, 0, { scale: 3 });
 
-    // Struktur-Linien
-    ctx.strokeStyle = 'rgba(20,24,34,0.6)';
-    for (let i = -60; i <= 60; i += 30) {
-      ctx.beginPath();
-      ctx.moveTo(i, -36); ctx.lineTo(i, 42);
-      ctx.stroke();
-    }
-
-    // Positionslichter
+    // Positionslichter an den Flügelspitzen
     const bl = 0.5 + 0.5 * Math.sin(this.t * 5);
     ctx.fillStyle = `rgba(255,80,80,${0.4 + 0.6 * bl})`;
-    ctx.beginPath(); ctx.arc(-96, 10, 3.5, 0, 6.3); ctx.fill();
-    ctx.beginPath(); ctx.arc(96, 10, 3.5, 0, 6.3); ctx.fill();
+    ctx.beginPath(); ctx.arc(-96, -3, 3.5, 0, 6.3); ctx.fill();
+    ctx.beginPath(); ctx.arc(96, -3, 3.5, 0, 6.3); ctx.fill();
 
     // Türme
     for (const pod of this.pods) {
       if (!pod.alive) {
-        ctx.fillStyle = '#1c212c';
-        ctx.beginPath(); ctx.arc(pod.off, 34, 12, 0, 6.3); ctx.fill();
+        drawSprite(ctx, SPRITES.bossPodDead, pod.off, 34);
         continue;
       }
-      if (pod.flash > 0) { ctx.shadowColor = '#fff'; ctx.shadowBlur = 12; }
-      ctx.fillStyle = '#79486e';
-      ctx.beginPath(); ctx.arc(pod.off, 34, 14, 0, 6.3); ctx.fill();
-      ctx.fillStyle = '#b76ba5';
-      ctx.beginPath(); ctx.arc(pod.off, 30, 8, 0, 6.3); ctx.fill();
-      ctx.shadowBlur = 0;
+      drawSprite(ctx, SPRITES.bossPod, pod.off, 34, { flash: pod.flash > 0 ? pod.flash + 0.04 : 0 });
       const hpF = pod.hp / pod.maxHp;
       ctx.fillStyle = '#141822';
       ctx.fillRect(pod.off - 12, 48, 24, 3);
@@ -1024,15 +927,10 @@ class PowerUp {
     ctx.translate(this.x, this.y);
     ctx.fillStyle = def.color + '44';
     ctx.beginPath(); ctx.arc(0, 0, 20 * pulse, 0, 6.3); ctx.fill();
-    ctx.rotate(Math.sin(this.t * 3) * 0.15);
-    ctx.fillStyle = 'rgba(10,16,30,0.9)';
-    ctx.beginPath(); ctx.arc(0, 0, 13, 0, 6.3); ctx.fill();
-    ctx.strokeStyle = def.color;
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(0, 0, 13, 0, 6.3); ctx.stroke();
-    ctx.lineWidth = 1;
-    ctx.fillStyle = def.color;
-    ctx.font = `bold ${this.type === 'U' ? 9 : 13}px 'Segoe UI', sans-serif`;
+    // Gradius-artige Pixel-Kapsel
+    drawSprite(ctx, SPRITES.capsule, 0, 0, { rot: Math.sin(this.t * 3) * 0.15 });
+    ctx.fillStyle = this.type === 'E' || this.type === 'D' ? def.color : '#7a2f10';
+    ctx.font = `bold ${this.type === 'U' ? 8 : 12}px 'Segoe UI', sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(def.label, 0, 1);

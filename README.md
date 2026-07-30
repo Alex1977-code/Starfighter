@@ -94,11 +94,16 @@ wird der Schwierigkeitsgrad mit angezeigt (L/N/S).
 
 ## Grafik: Modern ↔ Retro-Pixel
 
-Wie beim Sound lässt sich auch die Grafik in den **Optionen** umschalten:
+Alle Spielobjekte sind **handgesetzte Pixel-Art-Sprites** im Stil der
+Arcade-Automaten der 80er/90er: Outlines, Schattierungen, Cockpit-Glanz,
+Nieten, Panel-Linien, klassische 4-Frame-Explosionsanimationen — dazu ein
+Arcade-HUD mit blinkendem „1UP" und „HI-SCORE".
 
-- **Modern**: weiche Vektor-Grafik mit Glow, Schockwellen, Bodenschatten,
-  weichen Wolken und Vignette
-- **Retro-Pixel**: die Welt wird in niedriger Auflösung gerendert und
+Zusätzlich lässt sich der Look in den **Optionen** umschalten:
+
+- **Modern**: Pixel-Sprites plus Glow, Schockwellen, Bodenschatten,
+  weiche Wolken und Vignette (90er-Arcade mit Effekten)
+- **Retro-Pixel**: die Welt wird intern in 240×400 gerendert und
   pixelig hochskaliert – mit Scanlines wie auf einem Arcade-Monitor
 
 Sound- und Grafikstil sind unabhängig kombinierbar: modern spielen mit

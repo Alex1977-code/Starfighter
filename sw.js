@@ -1,11 +1,12 @@
 /* Starfighter — Service Worker: macht das Spiel offline spielbar */
-const CACHE = 'starfighter-v2';
+const CACHE = 'starfighter-v3';
 const ASSETS = [
   '.',
   'index.html',
   'style.css',
   'manifest.webmanifest',
   'js/audio.js',
+  'js/sprites.js',
   'js/terrain.js',
   'js/entities.js',
   'js/game.js',

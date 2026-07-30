@@ -79,6 +79,31 @@ angegangen, Ziel: **maximaler Spielspaß statt maximaler Frust**:
 | Verlust von allem beim Tod | Beim Respawn bleibt fast alles erhalten (nur eine Fächerstufe geht verloren) |
 | Repetitiver Sound | Eigener Soundtrack + Boss-Musik, komplett synthetisiert |
 
+## Schwierigkeitsgrade
+
+Direkt auf dem Titelbildschirm wählbar:
+
+| | Schild | Leben | Gegnertempo | Punkte |
+|---|---|---|---|---|
+| **Leicht** | 4 Zellen | 4 | langsamer, ruhigere Wellen | ×0,7 |
+| **Normal** | 3 Zellen | 3 | Standard | ×1,0 |
+| **Schwer** | 2 Zellen | 3 | schneller, dichtere Wellen | ×1,4 |
+
+Risiko lohnt sich: Auf „Schwer" gibt es 40 % mehr Punkte. In der Bestenliste
+wird der Schwierigkeitsgrad mit angezeigt (L/N/S).
+
+## Grafik: Modern ↔ Retro-Pixel
+
+Wie beim Sound lässt sich auch die Grafik in den **Optionen** umschalten:
+
+- **Modern**: weiche Vektor-Grafik mit Glow, Schockwellen, Bodenschatten,
+  weichen Wolken und Vignette
+- **Retro-Pixel**: die Welt wird in niedriger Auflösung gerendert und
+  pixelig hochskaliert – mit Scanlines wie auf einem Arcade-Monitor
+
+Sound- und Grafikstil sind unabhängig kombinierbar: modern spielen mit
+8-Bit-Sound, oder Voll-Retro wie am Automaten.
+
 ## Sound: Modern ↔ 8-Bit
 
 In den **Optionen** lässt sich der komplette Klang jederzeit umschalten:

@@ -20,6 +20,19 @@ function saveJSON(key, val) {
   try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* voll/privat */ }
 }
 
+/* ---------- Schwierigkeitsgrade ----------
+   ramp    = wie schnell die Schwierigkeit ansteigt
+   bulletF = Tempo feindlicher Projektile
+   spawnF  = Abstand zwischen Wellen (größer = ruhiger)
+   scoreMult: Risiko wird belohnt — Schwer bringt mehr Punkte */
+const DIFF_PRESETS = {
+  easy:   { letter: 'L', shield: 4, lives: 4, ramp: 0.7,  bulletF: 0.8,  spawnF: 1.25, scoreMult: 0.7 },
+  normal: { letter: 'N', shield: 3, lives: 3, ramp: 1.0,  bulletF: 1.0,  spawnF: 1.0,  scoreMult: 1.0 },
+  hard:   { letter: 'S', shield: 2, lives: 3, ramp: 1.35, bulletF: 1.18, spawnF: 0.82, scoreMult: 1.4 },
+};
+
+const RETRO_F = 3;   // Pixelfaktor im Retro-Grafikmodus
+
 /* ============================================================ */
 
 class Game {
@@ -30,12 +43,22 @@ class Game {
 
     this.settings = Object.assign({
       soundMode: 'modern',   // 'modern' | 'retro'
+      gfx: 'modern',         // 'modern' | 'retro'
+      difficulty: 'normal',  // 'easy' | 'normal' | 'hard'
       music: true,
       sfx: true,
       vibrate: true,
       sense: 'normal',       // 'normal' | 'high'
       lastName: '',
     }, loadJSON(LS_SETTINGS, {}));
+    if (!DIFF_PRESETS[this.settings.difficulty]) this.settings.difficulty = 'normal';
+
+    // Offscreen-Canvas für den Retro-Pixelmodus
+    this.lowCanvas = document.createElement('canvas');
+    this.lowCanvas.width = Math.ceil(W / RETRO_F);
+    this.lowCanvas.height = Math.ceil(H / RETRO_F);
+    this.lowCtx = this.lowCanvas.getContext('2d');
+    this.scanPattern = null;
 
     Sound.setMode(this.settings.soundMode);
     Sound.setMusicOn(this.settings.music);
@@ -75,7 +98,10 @@ class Game {
 
   /* ---------- Weltzustand ---------- */
   resetWorld() {
+    this.diffPreset = DIFF_PRESETS[this.settings.difficulty] || DIFF_PRESETS.normal;
     this.player = new Player();
+    this.player.shieldMax = this.diffPreset.shield;
+    this.player.shield = this.diffPreset.shield;
     this.playerBullets = [];
     this.enemyBullets = [];
     this.airEnemies = [];
@@ -83,11 +109,12 @@ class Game {
     this.bombs = [];
     this.powerups = [];
     this.particles = [];
+    this.shocks = [];
     this.floats = [];
     this.boss = null;
 
     this.score = 0;
-    this.lives = 3;
+    this.lives = this.diffPreset.lives;
     this.stage = 1;
     this.stageTimer = 0;
     this.nextLifeAt = 30000;
@@ -108,7 +135,18 @@ class Game {
   }
 
   get diff() {
-    return Math.min(4.5, 1 + (this.stage - 1) * 0.35 + this.stageTimer * 0.004);
+    const ramp = (this.diffPreset || DIFF_PRESETS.normal).ramp;
+    return Math.min(4.5, 1 + ((this.stage - 1) * 0.35 + this.stageTimer * 0.004) * ramp);
+  }
+
+  get bulletF() {
+    return (this.diffPreset || DIFF_PRESETS.normal).bulletF;
+  }
+
+  /* Punkte nach Schwierigkeit skalieren (auf 10er gerundet) */
+  pts(v) {
+    const m = (this.diffPreset || DIFF_PRESETS.normal).scoreMult;
+    return Math.max(10, Math.round(v * m / 10) * 10);
   }
 
   /* ============================================================
@@ -201,6 +239,31 @@ class Game {
     const ui = () => Sound.sfx('ui');
 
     this.$('btnStart').addEventListener('click', () => { Sound.ensure(); ui(); this.startGame(); });
+
+    // Schwierigkeitswahl auf dem Titel
+    const segs = Array.from(document.querySelectorAll('#diffRow .seg'));
+    const renderDiff = () => segs.forEach(b =>
+      b.classList.toggle('active', b.dataset.diff === this.settings.difficulty));
+    segs.forEach(b => b.addEventListener('click', () => {
+      Sound.ensure(); ui();
+      this.settings.difficulty = b.dataset.diff;
+      saveJSON(LS_SETTINGS, this.settings);
+      renderDiff();
+    }));
+    renderDiff();
+
+    // Beenden — im installierten PWA schließt sich das Fenster,
+    // im Browser-Tab zeigen wir einen Hinweis
+    this.$('btnQuit').addEventListener('click', () => {
+      ui();
+      Sound.stopMusic();
+      window.close();
+      setTimeout(() => {
+        const hint = this.$('quitHint');
+        hint.classList.remove('hidden');
+        setTimeout(() => hint.classList.add('hidden'), 3500);
+      }, 250);
+    });
     this.$('btnScores').addEventListener('click', () => { ui(); this.openScores(); });
     this.$('btnOptions').addEventListener('click', () => { ui(); this.openOptions('title'); });
     this.$('btnHelp').addEventListener('click', () => { ui(); this.hide('screenTitle'); this.show('screenHelp'); });
@@ -237,6 +300,15 @@ class Game {
     }, btn => {
       const retro = this.settings.soundMode === 'retro';
       btn.textContent = retro ? '8-Bit' : 'Modern';
+      btn.classList.toggle('retro', retro);
+      btn.classList.toggle('on', !retro);
+    });
+
+    this.bindToggle('optGfx', () => {
+      this.settings.gfx = this.settings.gfx === 'retro' ? 'modern' : 'retro';
+    }, btn => {
+      const retro = this.settings.gfx === 'retro';
+      btn.textContent = retro ? 'Retro-Pixel' : 'Modern';
       btn.classList.toggle('retro', retro);
       btn.classList.toggle('on', !retro);
     });
@@ -322,7 +394,7 @@ class Game {
         `<td class="rank">${i + 1}.</td>` +
         `<td class="name">${this.escapeHtml(s.name)}</td>` +
         `<td class="pts">${s.score.toLocaleString('de-DE')}</td>` +
-        `<td class="stg">St. ${s.stage}</td>`;
+        `<td class="stg">St. ${s.stage}${s.diff ? ' · ' + this.escapeHtml(s.diff) : ''}</td>`;
       rows.appendChild(tr);
     });
     this.show('screenScores');
@@ -402,7 +474,10 @@ class Game {
     saveJSON(LS_SETTINGS, this.settings);
 
     const scores = loadJSON(LS_SCORES, []);
-    const entry = { name, score: this.score, stage: this.stage, date: Date.now() };
+    const entry = {
+      name, score: this.score, stage: this.stage,
+      diff: (this.diffPreset || DIFF_PRESETS.normal).letter, date: Date.now(),
+    };
     scores.push(entry);
     scores.sort((a, b) => b.score - a.score);
     const top = scores.slice(0, 10);
@@ -442,8 +517,9 @@ class Game {
 
   onAirKill(e) {
     spawnExplosion(this, e.x, e.y, { count: 20 });
+    this.shocks.push(new Shockwave(e.x, e.y, 34));
     Sound.sfx('expl');
-    this.addScore(e.score, e.x, e.y);
+    this.addScore(this.pts(e.score), e.x, e.y);
     this.shake(2.5, 0.12);
 
     this.killsSinceDrop++;
@@ -472,7 +548,7 @@ class Game {
     this.chain = Math.min(8, this.chain + 1);
     this.chainTimer = 6;
     const mult = this.chain;
-    const pts = g.score * mult;
+    const pts = this.pts(g.score * mult);
     this.score += pts;
     this.floats.push(new FloatText(g.x, g.y - 14,
       mult > 1 ? `+${pts} ×${mult}` : `+${pts}`,
@@ -487,7 +563,7 @@ class Game {
     const p = this.player;
     if (!p.alive) return;
     const base = Math.atan2(p.y - y, p.x - x);
-    const spd = 135 + this.diff * 16;
+    const spd = (135 + this.diff * 16) * this.bulletF;
     for (let i = 0; i < count; i++) {
       const a = base + (i - (count - 1) / 2) * 0.22;
       this.enemyBullets.push(new EnemyBullet(x, y, Math.cos(a) * spd, Math.sin(a) * spd, false));
@@ -497,6 +573,7 @@ class Game {
   bombImpact(x, y) {
     const r = this.player.bombRadius;
     spawnExplosion(this, x, y, { count: 30, speed: 240, maxSize: 9, lifeScale: 1.2 });
+    this.shocks.push(new Shockwave(x, y, r * 1.5, '255,180,90'));
     Sound.sfx('gexpl');
     this.shake(5, 0.2);
     this.vibrate(30);
@@ -515,8 +592,10 @@ class Game {
   }
 
   onBossDefeated(boss) {
-    this.addScore(boss.score);
-    this.banner(`MUTTERSCHIFF ZERSTÖRT  +${boss.score.toLocaleString('de-DE')}`, '#ffe066');
+    const bonus = this.pts(boss.score);
+    this.addScore(bonus);
+    this.shocks.push(new Shockwave(boss.x, boss.y + 20, 170, '255,220,150'));
+    this.banner(`MUTTERSCHIFF ZERSTÖRT  +${bonus.toLocaleString('de-DE')}`, '#ffe066');
     this.boss = null;
     this.stage++;
     this.stageTimer = 0;
@@ -553,6 +632,7 @@ class Game {
     this.deathTimer = 1.7;
     this.lives--;
     spawnExplosion(this, p.x, p.y, { count: 44, speed: 280, maxSize: 10, lifeScale: 1.4 });
+    this.shocks.push(new Shockwave(p.x, p.y, 74, '140,210,255'));
     Sound.sfx('pdie');
     this.shake(12, 0.6);
     this.hitFlash = 0.55;
@@ -587,7 +667,8 @@ class Game {
     this.airTimer -= dt;
     if (this.airTimer <= 0) {
       const bossFactor = this.boss ? 2.1 : 1;
-      this.airTimer = Math.max(0.9, rand(1.7, 2.7) / (0.7 + this.diff * 0.22)) * bossFactor;
+      this.airTimer = Math.max(0.9, rand(1.7, 2.7) / (0.7 + this.diff * 0.22))
+        * bossFactor * this.diffPreset.spawnF;
       this.spawnAirWave();
     }
 
@@ -595,7 +676,8 @@ class Game {
     if (!this.boss) {
       this.groundTimer -= dt;
       if (this.groundTimer <= 0) {
-        this.groundTimer = Math.max(0.8, rand(1.3, 2.3) / (0.75 + this.diff * 0.15));
+        this.groundTimer = Math.max(0.8, rand(1.3, 2.3) / (0.75 + this.diff * 0.15))
+          * this.diffPreset.spawnF;
         this.spawnGround();
       }
     }
@@ -720,6 +802,7 @@ class Game {
 
   updateLists(dt) {
     this.particles = this.particles.filter(pt => pt.update(dt));
+    this.shocks = this.shocks.filter(s => s.update(dt));
     this.floats = this.floats.filter(f => f.update(dt));
   }
 
@@ -825,7 +908,7 @@ class Game {
         break;
     }
     if (type !== 'U') Sound.sfx('power');
-    this.addScore(500, x, y, true);
+    this.addScore(this.pts(500), x, y, true);
     this.floats.push(new FloatText(x, y - 18, def.name, def.color));
   }
 
@@ -842,17 +925,58 @@ class Game {
 
   draw() {
     const ctx = this.ctx;
+    const retro = this.settings.gfx === 'retro';
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
-    // Screenshake
+    if (!retro) {
+      ctx.save();
+      this.applyShake(ctx);
+      this.drawWorld(ctx, false);
+      ctx.restore();
+
+      // Vignette nur im modernen Look
+      const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.42, W / 2, H / 2, H * 0.75);
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, 'rgba(0,0,10,0.32)');
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      // Welt in niedriger Auflösung rendern, dann pixelig hochskalieren
+      const lctx = this.lowCtx;
+      lctx.setTransform(1 / RETRO_F, 0, 0, 1 / RETRO_F, 0, 0);
+      lctx.save();
+      this.applyShake(lctx);
+      this.drawWorld(lctx, true);
+      lctx.restore();
+
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(this.lowCanvas, 0, 0, W / RETRO_F, H / RETRO_F, 0, 0, W, H);
+      ctx.imageSmoothingEnabled = true;
+      this.drawScanlines(ctx);
+    }
+
+    // scharfe Overlays immer in voller Auflösung
+    for (const f of this.floats) f.draw(ctx);
+    if (this.state === 'playing') this.drawHUD(ctx);
+
+    if (this.hitFlash > 0) {
+      ctx.fillStyle = `rgba(255,60,60,${this.hitFlash * 0.5})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  applyShake(ctx) {
     if (this.shakeAmp > 0) {
       ctx.translate(
         (Math.random() - 0.5) * 2 * this.shakeAmp,
         (Math.random() - 0.5) * 2 * this.shakeAmp
       );
     }
+  }
 
+  drawWorld(ctx, retro) {
     this.terrain.draw(ctx, this.time);
+    this.drawShadows(ctx);
 
     for (const g of this.groundEnemies) g.draw(ctx);
     for (const u of this.powerups) u.draw(ctx);
@@ -870,29 +994,56 @@ class Game {
       }
     }
 
-    // Partikel: Glow additiv, Rauch normal
+    // Partikel & Schockwellen: Glow additiv, Rauch normal
     ctx.globalCompositeOperation = 'lighter';
+    for (const s of this.shocks) s.draw(ctx);
     for (const pt of this.particles) if (pt.glow) pt.draw(ctx);
     ctx.globalCompositeOperation = 'source-over';
     for (const pt of this.particles) if (!pt.glow) pt.draw(ctx);
 
-    this.terrain.drawClouds(ctx);
+    // Wolken nur im modernen Look — das Original kannte keine
+    if (!retro) this.terrain.drawClouds(ctx, true);
+  }
 
-    for (const f of this.floats) f.draw(ctx);
-
-    if (this.state === 'playing') this.drawHUD(ctx);
-
-    // Treffer-Blitz
-    if (this.hitFlash > 0) {
-      ctx.fillStyle = `rgba(255,60,60,${this.hitFlash * 0.5})`;
-      ctx.fillRect(0, 0, W, H);
+  /* Xevious-typische Bodenschatten unter allem, was fliegt */
+  drawShadows(ctx) {
+    ctx.fillStyle = 'rgba(0, 0, 20, 0.22)';
+    const sh = (x, y, rx, ry) => {
+      ctx.beginPath();
+      ctx.ellipse(x + 15, y + 22, rx, ry, 0, 0, 6.3);
+      ctx.fill();
+    };
+    for (const e of this.airEnemies) sh(e.x, e.y, e.r * 0.85, e.r * 0.38);
+    const p = this.player;
+    if (this.state === 'playing' && p.alive) {
+      sh(p.x, p.y, 17, 7);
+      for (let i = 0; i < p.drones; i++) sh(p.x + (i === 0 ? -34 : 34), p.y + 4, 7, 3);
     }
+    if (this.boss) {
+      ctx.beginPath();
+      ctx.ellipse(this.boss.x + 26, this.boss.y + 40, this.boss.w * 0.44, 24, 0, 0, 6.3);
+      ctx.fill();
+    }
+    // Bomben werfen wachsende Zielschatten
+    for (const b of this.bombs) {
+      const pr = clamp(b.t / b.dur, 0, 1);
+      ctx.beginPath();
+      ctx.ellipse(b.tx + 4, b.ty + 4, 5 + pr * 6, 2.5 + pr * 3, 0, 0, 6.3);
+      ctx.fill();
+    }
+  }
 
-    // Vignette für den modernen Look
-    const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.42, W / 2, H / 2, H * 0.75);
-    vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(0,0,10,0.32)');
-    ctx.fillStyle = vg;
+  drawScanlines(ctx) {
+    if (!this.scanPattern) {
+      const pc = document.createElement('canvas');
+      pc.width = 1;
+      pc.height = RETRO_F;
+      const px = pc.getContext('2d');
+      px.fillStyle = 'rgba(0,0,0,0.24)';
+      px.fillRect(0, RETRO_F - 1, 1, 1);
+      this.scanPattern = ctx.createPattern(pc, 'repeat');
+    }
+    ctx.fillStyle = this.scanPattern;
     ctx.fillRect(0, 0, W, H);
   }
 

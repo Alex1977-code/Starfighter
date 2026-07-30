@@ -181,6 +181,14 @@ class Terrain {
           const ph = ((row.gy * 13 + x * 7) % 32 + time * 26) % 32;
           ctx.fillStyle = 'rgba(180,220,255,0.10)';
           ctx.fillRect(x * TILE + 3, y + ph, TILE - 6, 2);
+          // Schaumkanten an Uferübergängen
+          const isW = tt => tt === T_WATER || tt === T_DEEP;
+          const above = this.rows[i - 1], below = this.rows[i + 1];
+          ctx.fillStyle = 'rgba(210,235,255,0.28)';
+          if (x > 0 && !isW(tiles[x - 1])) ctx.fillRect(x * TILE, y, 2, TILE);
+          if (x < cols - 1 && !isW(tiles[x + 1])) ctx.fillRect(x * TILE + TILE - 2, y, 2, TILE);
+          if (above && !isW(above.tiles[x])) ctx.fillRect(x * TILE, y, TILE, 2);
+          if (below && !isW(below.tiles[x])) ctx.fillRect(x * TILE, y + TILE - 2, TILE, 2);
         } else if (t === T_ROAD && row.isRoad) {
           ctx.fillStyle = '#c8c34a';
           if ((x & 1) === 0) ctx.fillRect(x * TILE + 4, y + TILE / 2 - 1, TILE - 12, 2);
@@ -219,14 +227,25 @@ class Terrain {
   }
 
   /* Wolken über den Sprites — Tiefenwirkung */
-  drawClouds(ctx) {
+  drawClouds(ctx, soft = true) {
     for (const c of this.clouds) {
-      ctx.fillStyle = `rgba(235,242,255,${c.alpha})`;
-      ctx.beginPath();
-      ctx.arc(c.x, c.y, c.r, 0, 6.3);
-      ctx.arc(c.x + c.r * 0.7, c.y + c.r * 0.25, c.r * 0.7, 0, 6.3);
-      ctx.arc(c.x - c.r * 0.65, c.y + c.r * 0.2, c.r * 0.6, 0, 6.3);
-      ctx.fill();
+      if (soft) {
+        // weicher Radialverlauf für den modernen Look
+        const g = ctx.createRadialGradient(c.x, c.y, c.r * 0.15, c.x, c.y, c.r * 1.6);
+        g.addColorStop(0, `rgba(235,242,255,${c.alpha * 1.5})`);
+        g.addColorStop(1, 'rgba(235,242,255,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, c.r * 1.6, 0, 6.3);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = `rgba(235,242,255,${c.alpha * 1.3})`;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, c.r, 0, 6.3);
+        ctx.arc(c.x + c.r * 0.7, c.y + c.r * 0.25, c.r * 0.7, 0, 6.3);
+        ctx.arc(c.x - c.r * 0.65, c.y + c.r * 0.2, c.r * 0.6, 0, 6.3);
+        ctx.fill();
+      }
     }
   }
 }

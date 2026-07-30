@@ -27,9 +27,15 @@
     <div class="tagline">Arcade &middot; Neuauflage</div>
     <div class="menu">
       <button id="btnStart" class="primary">&#9658;&nbsp; Start</button>
+      <div class="seg-row" id="diffRow" role="group" aria-label="Schwierigkeit">
+        <button class="seg" data-diff="easy">Leicht</button>
+        <button class="seg" data-diff="normal">Normal</button>
+        <button class="seg" data-diff="hard">Schwer</button>
+      </div>
       <button id="btnScores">&#127942;&nbsp; Bestenliste</button>
       <button id="btnOptions">&#9881;&nbsp; Optionen</button>
       <button id="btnHelp">&#10067;&nbsp; So wird gespielt</button>
+      <button id="btnQuit" class="quit">&#10006;&nbsp; Beenden</button>
     </div>
     <div class="stat-line" id="titleHiscore"></div>
   </div>
@@ -41,6 +47,10 @@
       <div class="opt-row">
         <span class="label">Soundstil<span class="sub">Modern oder Original-Arcade</span></span>
         <button id="optSoundMode" class="toggle on">Modern</button>
+      </div>
+      <div class="opt-row">
+        <span class="label">Grafikstil<span class="sub">Modern oder Retro-Pixel wie am Automaten</span></span>
+        <button id="optGfx" class="toggle on">Modern</button>
       </div>
       <div class="opt-row">
         <span class="label">Musik</span>
@@ -117,7 +127,9 @@
     </div>
   </div>
 
-  <div class="footer-note" id="footerNote">v1.0 &middot; l&auml;uft offline &middot; zum Homescreen hinzuf&uuml;gen f&uuml;r Vollbild</div>
+  <div class="footer-note" id="footerNote">v1.1 &middot; l&auml;uft offline &middot; zum Homescreen hinzuf&uuml;gen f&uuml;r Vollbild</div>
+
+  <div id="quitHint" class="toast hidden">Danke f&uuml;rs Spielen! Du kannst die App jetzt schlie&szlig;en.</div>
 
   <script src="js/audio.js"></script>
   <script src="js/terrain.js"></script>

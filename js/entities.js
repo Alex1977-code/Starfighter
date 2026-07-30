@@ -41,6 +41,32 @@ class Particle {
   }
 }
 
+/* expandierender Explosions-Ring */
+class Shockwave {
+  constructor(x, y, maxR, color) {
+    this.x = x; this.y = y;
+    this.r = 6;
+    this.maxR = maxR;
+    this.color = color || '255,210,140';
+    this.life = 0.38;
+    this.maxLife = 0.38;
+  }
+  update(dt) {
+    this.life -= dt;
+    this.r += (this.maxR - this.r) * Math.min(1, 9 * dt);
+    return this.life > 0;
+  }
+  draw(ctx) {
+    const a = clamp(this.life / this.maxLife, 0, 1);
+    ctx.strokeStyle = `rgba(${this.color},${0.75 * a})`;
+    ctx.lineWidth = 2.5 * a + 0.5;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, 6.3);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+}
+
 class FloatText {
   constructor(x, y, text, color, big) {
     this.x = x; this.y = y; this.text = text;
@@ -258,6 +284,11 @@ class Player {
       const off = i === 0 ? -34 : 34;
       B.push(new PlayerBullet(this.x + off, this.y + 2, 0, -560));
     }
+    // Mündungsfeuer
+    game.particles.push(new Particle(
+      this.x, this.y - 22, rand(-8, 8), -60,
+      0.07, 5, '#cfeaff', true
+    ));
     game.sound.sfx('shot');
   }
 
@@ -569,7 +600,7 @@ class Spinner extends AirEnemy {
     this.fireIn -= dt;
     if (this.fireIn <= 0 && this.y > 30 && this.y < 520) {
       this.fireIn = Math.max(0.42, 0.85 - game.diff * 0.05);
-      const spd = 120 + game.diff * 14;
+      const spd = (120 + game.diff * 14) * game.bulletF;
       this.spiralA += 2.4;
       game.enemyBullets.push(new EnemyBullet(
         this.x, this.y,
@@ -649,7 +680,7 @@ class GroundEnemy {
       this.fireIn -= dt;
       if (this.fireIn <= 0 && this.y > 40 && this.y < 640 && p.alive) {
         this.fireIn = rand(2.0, 3.2) / (0.75 + game.diff * 0.08);
-        const spd = 95 + game.diff * 11;
+        const spd = (95 + game.diff * 11) * game.bulletF;
         game.enemyBullets.push(new EnemyBullet(
           this.x + Math.cos(this.aim) * 14, this.y + Math.sin(this.aim) * 14,
           Math.cos(this.aim) * spd, Math.sin(this.aim) * spd, true
@@ -797,7 +828,7 @@ class Boss {
         pod.fireIn = rand(1.6, 2.8) / (0.8 + game.diff * 0.06);
         const px = this.x + pod.off, py = this.podY;
         const a = Math.atan2(p.y - py, p.x - px);
-        const spd = 150 + game.diff * 14;
+        const spd = (150 + game.diff * 14) * game.bulletF;
         game.enemyBullets.push(new EnemyBullet(px, py, Math.cos(a) * spd, Math.sin(a) * spd, false));
       }
     }
@@ -807,7 +838,7 @@ class Boss {
     if (this.ringIn <= 0 && p.alive) {
       this.ringIn = this.coreExposed ? 2.6 : 4.2;
       const n = this.coreExposed ? 16 : 10;
-      const spd = 130 + game.diff * 10;
+      const spd = (130 + game.diff * 10) * game.bulletF;
       const a0 = Math.random() * 6.3;
       for (let i = 0; i < n; i++) {
         const a = a0 + i * Math.PI * 2 / n;
@@ -829,8 +860,9 @@ class Boss {
         if (pod.hp <= 0) {
           pod.alive = false;
           spawnExplosion(game, this.x + pod.off, this.podY, { count: 20 });
+          game.shocks.push(new Shockwave(this.x + pod.off, this.podY, 40));
           game.sound.sfx('expl');
-          game.addScore(400, this.x + pod.off, this.podY);
+          game.addScore(game.pts(400), this.x + pod.off, this.podY);
           if (this.coreExposed) game.banner('KERN FREIGELEGT!', '#ffe066');
         }
         return true;

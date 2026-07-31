@@ -47,6 +47,7 @@ class Game {
       soundMode: 'modern',   // 'modern' | 'retro'
       gfx: 'modern',         // 'modern' | 'retro'
       difficulty: 'normal',  // 'easy' | 'normal' | 'hard'
+      mode: 'campaign',      // 'campaign' (Stufen + Bosse) | 'endless'
       music: true,
       sfx: true,
       vibrate: true,
@@ -54,6 +55,7 @@ class Game {
       lastName: '',
     }, loadJSON(LS_SETTINGS, {}));
     if (!DIFF_PRESETS[this.settings.difficulty]) this.settings.difficulty = 'normal';
+    if (!['campaign', 'endless'].includes(this.settings.mode)) this.settings.mode = 'campaign';
 
     // Offscreen-Canvas für den Retro-Pixelmodus
     this.lowCanvas = document.createElement('canvas');
@@ -140,7 +142,8 @@ class Game {
 
   get diff() {
     const ramp = (this.diffPreset || DIFF_PRESETS.normal).ramp;
-    return Math.min(4.5, 1 + ((this.stage - 1) * 0.35 + this.stageTimer * 0.004) * ramp);
+    const cap = this.settings.mode === 'endless' ? 7 : 4.5;   // endlos wird immer härter
+    return Math.min(cap, 1 + ((this.stage - 1) * 0.35 + this.stageTimer * 0.004) * ramp);
   }
 
   get bulletF() {
@@ -255,6 +258,18 @@ class Game {
       renderDiff();
     }));
     renderDiff();
+
+    // Spielmodus-Wahl (Missionen / Endlos)
+    const modeSegs = Array.from(document.querySelectorAll('#modeRow .seg'));
+    const renderMode = () => modeSegs.forEach(b =>
+      b.classList.toggle('active', b.dataset.mode === this.settings.mode));
+    modeSegs.forEach(b => b.addEventListener('click', () => {
+      Sound.ensure(); ui();
+      this.settings.mode = b.dataset.mode;
+      saveJSON(LS_SETTINGS, this.settings);
+      renderMode();
+    }));
+    renderMode();
 
     // Beenden — im installierten PWA schließt sich das Fenster,
     // im Browser-Tab zeigen wir einen Hinweis
@@ -398,7 +413,7 @@ class Game {
         `<td class="rank">${i + 1}.</td>` +
         `<td class="name">${this.escapeHtml(s.name)}</td>` +
         `<td class="pts">${s.score.toLocaleString('de-DE')}</td>` +
-        `<td class="stg">St. ${s.stage}${s.diff ? ' · ' + this.escapeHtml(s.diff) : ''}</td>`;
+        `<td class="stg">${s.endless ? '&infin;' : 'St.'} ${s.stage}${s.diff ? ' · ' + this.escapeHtml(s.diff) : ''}</td>`;
       rows.appendChild(tr);
     });
     this.show('screenScores');
@@ -418,7 +433,7 @@ class Game {
     this.$('footerNote').style.display = 'none';
     Sound.ensure();
     Sound.startMusic('main');
-    this.banner('STUFE 1', '#9fe8ff');
+    this.banner(this.settings.mode === 'endless' ? 'ENDLOS — WELLE 1' : 'STUFE 1', '#9fe8ff');
     this.floats.push(new FloatText(W / 2, 470, 'Ziehen = Steuern', '#cfe0ff'));
     this.floats.push(new FloatText(W / 2, 496, 'Feuer & Bomben: automatisch', '#8fa8d0'));
   }
@@ -453,7 +468,9 @@ class Game {
     this.$('pauseBtn').classList.remove('visible');
 
     this.$('finalScore').textContent = this.score.toLocaleString('de-DE');
-    this.$('finalStage').textContent = `Erreichte Stufe: ${this.stage}`;
+    this.$('finalStage').textContent = this.settings.mode === 'endless'
+      ? `Erreichte Welle: ${this.stage} (Endlos)`
+      : `Erreichte Stufe: ${this.stage}`;
 
     const scores = loadJSON(LS_SCORES, []);
     const qualifies = !aborted && this.score > 0 &&
@@ -480,7 +497,9 @@ class Game {
     const scores = loadJSON(LS_SCORES, []);
     const entry = {
       name, score: this.score, stage: this.stage,
-      diff: (this.diffPreset || DIFF_PRESETS.normal).letter, date: Date.now(),
+      diff: (this.diffPreset || DIFF_PRESETS.normal).letter,
+      endless: this.settings.mode === 'endless',
+      date: Date.now(),
     };
     scores.push(entry);
     scores.sort((a, b) => b.score - a.score);
@@ -539,11 +558,13 @@ class Game {
     const p = this.player;
     const pool = [];
     const add = (t, w) => { for (let i = 0; i < w; i++) pool.push(t); };
-    add('S', p.spread < 3 ? 24 : 4);
-    add('R', p.rapid < 2 ? 20 : 4);
+    add('S', p.weapon === 'vulcan' && p.spread < 3 ? 20 : 6);
+    add('L', p.weapon === 'laser' ? (p.laserLvl < 3 ? 18 : 3) : 10);
+    add('H', p.homing < 2 ? 12 : 2);
+    add('R', p.rapid < 2 ? 18 : 4);
     add('E', p.shield < p.shieldMax ? 22 : 6);
-    add('D', p.drones < 2 ? 12 : 2);
-    add('B', p.megaBomb ? 2 : 10);
+    add('D', p.drones < 2 ? 10 : 2);
+    add('B', p.megaBomb ? 2 : 9);
     if (this.lives < 4) add('U', 3);
     return pick(pool);
   }
@@ -586,6 +607,11 @@ class Game {
     this.vibrate(30);
 
     let kills = 0;
+    // Festungskern getroffen?
+    if (this.boss && this.boss.kind === 'fortress' && this.boss.bombHit(x, y, r, this)) {
+      kills++;   // zählt als Treffer — Kette bleibt erhalten
+      this.floats.push(new FloatText(this.boss.x, this.boss.coreY - 20, 'KERNTREFFER!', '#ffe066'));
+    }
     for (const g of this.groundEnemies) {
       if (g.alive && dist2(g.x, g.y, x, y) < (r + g.r) * (r + g.r)) {
         g.hurt(1, this);
@@ -602,7 +628,8 @@ class Game {
     const bonus = this.pts(boss.score);
     this.addScore(bonus);
     this.shocks.push(new Shockwave(boss.x, boss.y + 20, 170, '255,220,150'));
-    this.banner(`MUTTERSCHIFF ZERSTÖRT  +${bonus.toLocaleString('de-DE')}`, '#ffe066');
+    const what = boss.kind === 'fortress' ? 'FESTUNG' : 'MUTTERSCHIFF';
+    this.banner(`${what} ZERSTÖRT  +${bonus.toLocaleString('de-DE')}`, '#ffe066');
     this.boss = null;
     this.stage++;
     this.stageTimer = 0;
@@ -653,7 +680,9 @@ class Game {
     p.x = W / 2; p.y = 640;
     p.shield = p.shieldMax;
     p.invuln = 2.6;
-    p.spread = Math.max(1, p.spread - 1);   // milde Strafe statt Total-Reset
+    // milde Strafe statt Total-Reset: eine Waffenstufe runter
+    if (p.weapon === 'laser') p.laserLvl = Math.max(1, p.laserLvl - 1);
+    else p.spread = Math.max(1, p.spread - 1);
     p.tilt = 0;
   }
 
@@ -663,10 +692,25 @@ class Game {
   director(dt) {
     this.stageTimer += dt;
 
-    // Boss auslösen
-    if (!this.boss && this.stageTimer > 65) {
-      this.boss = new Boss(this.stage);
-      this.banner('WARNUNG: MUTTERSCHIFF!', '#ff5c8f');
+    if (this.settings.mode === 'endless') {
+      // Endlos: keine Bosse, dafür steigende Wellen ohne Ende
+      if (this.stageTimer > 60) {
+        this.stageTimer = 0;
+        this.stage++;
+        this.scrollSpeed = Math.min(160, 92 + (this.stage - 1) * 7);
+        this.banner(`WELLE ${this.stage}`, '#9fe8ff');
+        Sound.sfx('boss');
+      }
+    } else if (!this.boss && this.stageTimer > 65) {
+      // Kampagne: Bosse im Wechsel — Mutterschiff / Bodenfestung
+      if (this.stage % 2 === 1) {
+        this.boss = new Boss(this.stage);
+        this.banner('WARNUNG: MUTTERSCHIFF!', '#ff5c8f');
+      } else {
+        this.boss = new Fortress(this.stage);
+        this.banner('WARNUNG: BODENFESTUNG!', '#c6e06a');
+        this.floats.push(new FloatText(W / 2, 370, 'Kern nur mit Bomben verwundbar!', '#ffd9a0'));
+      }
       Sound.sfx('boss');
       Sound.startMusic('boss');
     }
@@ -692,11 +736,12 @@ class Game {
   }
 
   spawnAirWave() {
-    const s = this.stage, d = this.diff;
-    const types = ['drones', 'swoopers', 'divers'];
-    if (s >= 1) types.push('gunner');
-    if (s >= 2) types.push('spinner', 'gunner');
-    if (s >= 3) types.push('spinner');
+    const d = this.diff;
+    const types = ['drones', 'swoopers', 'divers', 'gunner'];
+    if (d >= 1.4) types.push('splitter');
+    if (d >= 1.7) types.push('spinner', 'gunner');
+    if (d >= 2.0) types.push('minelayer', 'splitter');
+    if (d >= 2.5) types.push('spinner');
     const kind = pick(types);
 
     switch (kind) {
@@ -735,15 +780,32 @@ class Game {
       case 'spinner':
         this.airEnemies.push(new Spinner(rand(80, 400), d));
         break;
+      case 'splitter': {
+        const n = 1 + (d > 2.6 ? 1 : 0);
+        for (let i = 0; i < n; i++) this.airEnemies.push(new Splitter(rand(70, 410), d));
+        break;
+      }
+      case 'minelayer':
+        this.airEnemies.push(new Minelayer(Math.random() < 0.5, rand(70, 180), d));
+        break;
     }
   }
 
   spawnGround() {
+    const d = this.diff;
+    const pool = [['dome', 24], ['turret', 22], ['tank', 18], ['radar', 10]];
+    if (d >= 1.6) pool.push(['silo', 12]);
+    if (d >= 2.2) pool.push(['flak', 12]);
+    const total = pool.reduce((s, e) => s + e[1], 0);
     const n = Math.random() < 0.3 ? 2 : 1;
     for (let i = 0; i < n; i++) {
-      const roll = Math.random();
-      const type = roll < 0.30 ? 'dome' : roll < 0.60 ? 'turret' : roll < 0.85 ? 'tank' : 'radar';
-      this.groundEnemies.push(new GroundEnemy(rand(45, 435), -30 - i * 50, type, this.diff));
+      let roll = Math.random() * total;
+      let type = 'dome';
+      for (const [ty, w] of pool) {
+        roll -= w;
+        if (roll <= 0) { type = ty; break; }
+      }
+      this.groundEnemies.push(new GroundEnemy(rand(45, 435), -30 - i * 50, type, d));
     }
   }
 
@@ -785,8 +847,8 @@ class Game {
 
     for (const e of this.airEnemies) e.update(dt, this);
     for (const g of this.groundEnemies) g.update(dt, this);
-    for (const b of this.playerBullets) b.update(dt);
-    for (const b of this.enemyBullets) b.update(dt);
+    for (const b of this.playerBullets) b.update(dt, this);
+    for (const b of this.enemyBullets) b.update(dt, this);
     for (const b of this.bombs) b.update(dt, this);
     for (const u of this.powerups) u.update(dt, this);
     this.updateLists(dt);
@@ -826,6 +888,22 @@ class Game {
       const d = dist2(g.x, g.y, rx, ry);
       if (d < bestD) { bestD = d; best = g; }
     }
+    // offener Festungskern ist ebenfalls ein Bombenziel (mit Vorrang)
+    let coreLock = false;
+    if (this.boss && this.boss.kind === 'fortress' && this.boss.bombable) {
+      if (dist2(this.boss.x, this.boss.coreY, rx, ry) < 90 * 90) { best = null; coreLock = true; }
+    }
+    if (coreLock) {
+      this.lockedTarget = this.boss;
+      if (this.lastLock !== this.boss) Sound.sfx('lock');
+      if (p.bombTimer <= 0) {
+        p.bombTimer = 0.55;
+        this.bombs.push(new Bomb(p.x, p.y - 8, this.boss.x, this.boss.coreY, true));
+        Sound.sfx('bomb');
+      }
+      this.lastLock = this.boss;
+      return;
+    }
     if (best) {
       if (this.lastLock !== best) Sound.sfx('lock');
       this.lockedTarget = best;
@@ -846,7 +924,7 @@ class Game {
   collisions() {
     const p = this.player;
 
-    // Spielerschüsse
+    // Spielerschüsse (Vulcan, Laser mit Durchschlag, Raketen)
     for (const b of this.playerBullets) {
       if (!b.alive) continue;
       if (this.boss && this.boss.dying <= 0 && this.boss.hitTest(b, this)) {
@@ -856,9 +934,20 @@ class Game {
       for (const e of this.airEnemies) {
         if (!e.alive) continue;
         if (dist2(b.x, b.y, e.x, e.y) < (e.r + b.r) * (e.r + b.r)) {
-          b.alive = false;
-          e.hurt(1, this);
-          break;
+          if (b.pierce !== undefined) {
+            if (b.hitSet.has(e)) continue;      // pro Ziel nur einmal
+            b.hitSet.add(e);
+            e.hurt(b.dmg, this);
+            b.pierce--;
+            if (b.pierce <= 0) { b.alive = false; break; }
+          } else {
+            b.alive = false;
+            e.hurt(b.dmg || 1, this);
+            if (b instanceof PlayerMissile) {
+              this.explosions.push(new BoomAnim(b.x, b.y, 1.8));
+            }
+            break;
+          }
         }
       }
     }
@@ -905,7 +994,15 @@ class Game {
     const p = this.player;
     const def = POWERUP_DEFS[type];
     switch (type) {
-      case 'S': p.spread = Math.min(3, p.spread + 1); break;
+      case 'S':
+        if (p.weapon === 'vulcan') p.spread = Math.min(3, p.spread + 1);
+        else p.weapon = 'vulcan';          // Waffenwechsel wie bei Raiden
+        break;
+      case 'L':
+        if (p.weapon === 'laser') p.laserLvl = Math.min(3, p.laserLvl + 1);
+        else p.weapon = 'laser';
+        break;
+      case 'H': p.homing = Math.min(2, p.homing + 1); break;
       case 'R': p.rapid = Math.min(2, p.rapid + 1); break;
       case 'E': p.shield = p.shieldMax; break;
       case 'D': p.drones = Math.min(2, p.drones + 1); break;

@@ -30,12 +30,26 @@ Du fliegst über eine endlos scrollende Welt aus Wiesen, Wäldern, Ozeanen,
 Wüsten und feindlichen Tech-Basen. Wie beim großen Vorbild gibt es **zwei
 Waffensysteme**:
 
-- die **Bordkanone** gegen Luftziele (feuert automatisch)
+- die **Bordkanone** gegen Luftziele (feuert automatisch) – wahlweise als
+  **Fächerfeuer** oder **durchschlagender Laser** (Power-ups S/L wechseln
+  das System, erneutes Einsammeln verstärkt es)
 - **Bomben** gegen Bodenziele – ein Fadenkreuz fliegt vor dem Schiff her,
   Ziele darin werden automatisch bombardiert
+- optional dazu: **Zielsuchraketen** (Power-up H)
 
-Alle 60–70 Sekunden wartet ein **Mutterschiff-Boss**: erst die vier Türme
-knacken, dann den freigelegten Kern zerstören.
+**Zwei Spielmodi**, direkt auf dem Titel wählbar:
+
+- **Missionen**: Alle 60–70 Sekunden wartet ein Boss – im Wechsel das
+  **Mutterschiff** (erst die vier Türme, dann der freigelegte Kern) und
+  die **Bodenfestung**, deren Kern sich nur periodisch öffnet und
+  **ausschließlich mit Bomben** verwundbar ist
+- **Endlos**: keine Bosse, dafür ohne Ende steigende Wellen – wie lange
+  hältst du durch? (In der Bestenliste mit ∞ markiert)
+
+**Gegner-Arsenal** (9 Luft- + 6 Bodentypen): Toroid-Ringdrohnen,
+Kurvenflieger, Sturzflieger, Kanonenboote, Kreisel, Panzerkäfer (zerfallen
+in Splitter), Minenleger mit Schwebeminen, Zielsuchraketen aus Bodensilos,
+Flak-Batterien mit Sprenggranaten, Geschütztürme, Panzer, Radaranlagen …
 
 ### Steuerung (bewusst einfach)
 
@@ -56,7 +70,9 @@ die Kette zurück. Extraleben gibt es ab 30.000 Punkten, danach alle 50.000.
 
 | Symbol | Wirkung |
 |---|---|
-| **S** | Fächerfeuer (bis zu 5 Schüsse) |
+| **S** | Fächerfeuer (bis zu 5 Schüsse) / Wechsel auf Vulcan |
+| **L** | Laser: durchschlägt bis zu 3 Gegner / Wechsel auf Laser |
+| **H** | Zielsuchraketen-Werfer (max. 2) |
 | **R** | höhere Feuerrate |
 | **E** | Schild komplett auffüllen |
 | **D** | Begleit-Drohne (max. 2) |

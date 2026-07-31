@@ -158,6 +158,42 @@ class SoundEngine {
     }
   }
 
+  _sfx_laser(t) {
+    if (this.mode === 'retro') {
+      const g = this._env(t, 0.09, 0.002, 0.07);
+      this._osc('square', 1800, t, 0.08, 300).connect(g);
+      this._out(g);
+    } else {
+      const g = this._env(t, 0.08, 0.002, 0.09);
+      const f = this.ctx.createBiquadFilter();
+      f.type = 'highpass';
+      f.frequency.setValueAtTime(400, t);
+      this._osc('sawtooth', 2200, t, 0.1, 500).connect(f);
+      f.connect(g);
+      this._out(g, 0.2);
+      const g2 = this._env(t, 0.05, 0.002, 0.06);
+      this._osc('sine', 1100, t, 0.07, 350).connect(g2);
+      this._out(g2);
+    }
+  }
+
+  _sfx_missile(t) {
+    const retro = this.mode === 'retro';
+    const g = this._env(t, 0.07, 0.01, 0.22);
+    if (retro) {
+      this._noise(t, 0.24, true).connect(g);
+    } else {
+      const f = this.ctx.createBiquadFilter();
+      f.type = 'bandpass';
+      f.frequency.setValueAtTime(600, t);
+      f.frequency.exponentialRampToValueAtTime(2400, t + 0.22);
+      f.Q.value = 3;
+      this._noise(t, 0.24, false).connect(f);
+      f.connect(g);
+    }
+    this._out(g, 0.2);
+  }
+
   _sfx_bomb(t) {
     // fallende Bombe: Pfeifton abwärts
     const retro = this.mode === 'retro';

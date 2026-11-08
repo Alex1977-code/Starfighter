@@ -375,6 +375,144 @@ SPRITES.boom = [
   ], { mirror: true }),
 ];
 
+/* --- Spalter: Panzerkäfer, zerfällt in zwei Splitter --- */
+SPRITES.splitter = makeSprite([
+  '....oo.',
+  '..ooYy.',
+  '.oYyooo',
+  '.oyoMmm',
+  'ooYommm',
+  'oYyomMm',
+  'oyYonnm',
+  'ooYomMm',
+  '.oyommm',
+  '.oYyooo',
+  '..ooYy.',
+  '....oo.',
+], { mirror: true });
+
+/* --- Splitter-Fragment --- */
+SPRITES.fragment = makeSprite([
+  '..o',
+  '.om',
+  'omM',
+  'omM',
+  '.on',
+  '..o',
+], { mirror: true });
+
+/* --- Minenleger: breiter Lastkahn --- */
+SPRITES.minelayer = makeSprite([
+  '......ooooo',
+  '..oooodddgg',
+  '.odddgggllg',
+  'odgglllgggd',
+  'odglgggdddd',
+  'odgggddeeee',
+  'oddeeeseses',
+  '.oeeeeeeeee',
+  '..ooooooooo',
+], { mirror: true });
+
+/* --- Schwebemine: Stachelkugel --- */
+SPRITES.mine = makeSprite([
+  '....o',
+  '.o.oY',
+  '.ooYy',
+  'ooYyy',
+  'oYyry',
+  'ooYyy',
+  '.ooYy',
+  '.o.oY',
+  '....o',
+], { mirror: true });
+
+/* --- Raketensilo (Boden) --- */
+SPRITES.silo = makeSprite([
+  '..oooooo',
+  '.oddgggl',
+  'odglllgg',
+  'odgloooo',
+  'odgloees',
+  'odgloese',
+  'odgloees',
+  'odgloooo',
+  'odggdddd',
+  '.oeeeeee',
+  '..oooooo',
+], { mirror: true });
+
+/* --- Flak-Batterie (Boden) --- */
+SPRITES.flak = makeSprite([
+  '...ooooo',
+  '..odddgg',
+  '.odgollo',
+  'odggollo',
+  'odgggoo.',
+  'odgollo.',
+  'oegollo.',
+  'oedggoo.',
+  '.oeedddd',
+  '..oooooo',
+], { mirror: true });
+
+/* --- Rakete (Zielsucher, Spieler & Silo) --- */
+SPRITES.missile = makeSprite([
+  '.o',
+  'ow',
+  'ol',
+  'ol',
+  'og',
+  'oY',
+], { mirror: true });
+
+/* --- Festungs-Boss: Bastion (Kern/Türme dynamisch) --- */
+SPRITES.fortress = (function () {
+  const H = 30, WA = 32;
+  const left = [24, 20, 16, 13, 10, 8, 6, 5, 4, 3, 2, 2, 1, 1, 0, 0, 0, 1, 1, 2,
+                2, 3, 4, 5, 6, 8, 10, 13, 16, 20];
+  const darker = { w: 'l', l: 'g', g: 'd', d: 'e', e: 's', s: 's', v: 'V', V: 'b', b: 'b' };
+  const rows = [];
+  for (let y = 0; y < H; y++) {
+    let row = '';
+    for (let x = 0; x < WA; x++) {
+      if (x < left[y]) { row += '.'; continue; }
+      const aboveOut = y === 0 || x < left[y - 1];
+      const belowOut = y === H - 1 || x < left[y + 1];
+      if (x === left[y] || aboveOut || belowOut) { row += 'o'; continue; }
+      // Bronze-grüne Panzerung, oben hell
+      let ch = y < 5 ? 'v' : y < 12 ? 'V' : y < 20 ? 'b' : y < 25 ? 'e' : 's';
+      // Mittelbereich: Stahlplatte um den Kern
+      const cx = WA - 1 - x;
+      if (cx < 12 && y > 8 && y < 24) ch = y < 12 ? 'g' : y < 18 ? 'd' : 'e';
+      // Warnstreifen am oberen Wall
+      if (y === 6 && x > left[y] + 1 && x < WA - 13) ch = ((x & 2) ? 'y' : 'Y');
+      // Bunker-Schlitze
+      if (y >= 14 && y <= 16 && x >= left[y] + 3 && x <= left[y] + 4) ch = 'o';
+      if (y >= 14 && y <= 16 && x >= left[y] + 8 && x <= left[y] + 9) ch = 'o';
+      // Panel-Linien & Sprenkel
+      if (x % 6 === 0 && y > 4 && y < 24) ch = darker[ch] || ch;
+      if ((x * 11 + y * 7) % 31 === 0) ch = darker[ch] || ch;
+      row += ch;
+    }
+    rows.push(row);
+  }
+  return makeSprite(rows, { mirror: true });
+})();
+
+/* --- Festungs-Turm (bronze) --- */
+SPRITES.fortressPod = makeSprite([
+  '...oo',
+  '..ovv',
+  '.ovvV',
+  'ovyvV',
+  'ovvVV',
+  'oVVVb',
+  'obVbb',
+  '.obbo',
+  '..oo.',
+], { mirror: true });
+
 /* --- Power-up-Kapsel (Buchstabe wird darüber gerendert) --- */
 SPRITES.capsule = makeSprite([
   '...oooo',

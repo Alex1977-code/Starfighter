@@ -163,6 +163,92 @@ class PlayerBullet {
   }
 }
 
+/* durchschlagender Laserbolzen (Raiden-Stil) */
+class PlayerLaser {
+  constructor(x, y, w) {
+    this.x = x; this.y = y;
+    this.w = w;
+    this.vy = -780;
+    this.r = 6;
+    this.dmg = 2;
+    this.pierce = 3;
+    this.hitSet = new Set();
+    this.alive = true;
+  }
+  update(dt) {
+    this.y += this.vy * dt;
+    if (this.y < -40) this.alive = false;
+  }
+  draw(ctx) {
+    ctx.fillStyle = 'rgba(90,140,255,0.30)';
+    ctx.fillRect(this.x - this.w, this.y - 16, this.w * 2, 34);
+    ctx.fillStyle = '#7fa8ff';
+    ctx.fillRect(this.x - this.w / 2, this.y - 14, this.w, 30);
+    ctx.fillStyle = '#e6efff';
+    ctx.fillRect(this.x - 1, this.y - 12, 2, 26);
+  }
+}
+
+/* Zielsuchrakete des Spielers */
+class PlayerMissile {
+  constructor(x, y, side) {
+    this.x = x; this.y = y;
+    this.a = -Math.PI / 2 + side * 0.5;     // Startwinkel leicht seitlich
+    this.speed = 260;
+    this.dmg = 3;
+    this.r = 6;
+    this.t = 0;
+    this.ttl = 2.4;
+    this.target = null;
+    this.alive = true;
+  }
+  update(dt, game) {
+    this.t += dt;
+    this.ttl -= dt;
+    if (this.ttl <= 0) { this.alive = false; return; }
+    if (!this.target || !this.target.alive) {
+      // nächstes Luftziel suchen
+      let best = null, bd = Infinity;
+      for (const e of game.airEnemies) {
+        if (!e.alive || e.y < -20) continue;
+        const d = dist2(e.x, e.y, this.x, this.y);
+        if (d < bd) { bd = d; best = e; }
+      }
+      this.target = best;
+    }
+    let want = this.a;
+    if (this.target) {
+      want = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+    } else if (game.boss && game.boss.dying <= 0) {
+      want = Math.atan2(game.boss.y - this.y, game.boss.x - this.x);
+    } else {
+      want = -Math.PI / 2;
+    }
+    let dA = want - this.a;
+    while (dA > Math.PI) dA -= Math.PI * 2;
+    while (dA < -Math.PI) dA += Math.PI * 2;
+    this.a += clamp(dA, -5.5 * dt, 5.5 * dt);
+    this.speed = Math.min(540, this.speed + 500 * dt);
+    this.x += Math.cos(this.a) * this.speed * dt;
+    this.y += Math.sin(this.a) * this.speed * dt;
+    if (this.y < -30 || this.y > 830 || this.x < -30 || this.x > 510) this.alive = false;
+    // Rauchfahne
+    if (Math.random() < dt * 40) {
+      game.particles.push(new Particle(
+        this.x, this.y, rand(-12, 12), rand(-8, 30),
+        rand(0.2, 0.4), rand(1.5, 3), 'rgba(200,205,220,0.5)', false
+      ));
+    }
+  }
+  draw(ctx) {
+    drawSprite(ctx, SPRITES.missile, this.x, this.y, { rot: this.a + Math.PI / 2 });
+    ctx.fillStyle = 'rgba(255,190,90,0.8)';
+    ctx.beginPath();
+    ctx.arc(this.x - Math.cos(this.a) * 8, this.y - Math.sin(this.a) * 8, 2.5, 0, 6.3);
+    ctx.fill();
+  }
+}
+
 class EnemyBullet {
   constructor(x, y, vx, vy, big) {
     this.x = x; this.y = y;
@@ -195,11 +281,50 @@ class EnemyBullet {
   }
 }
 
+/* Flak-Granate: platzt nach Zündzeit in einen Ring */
+class FlakShell {
+  constructor(x, y, vx, vy, fuse) {
+    this.x = x; this.y = y;
+    this.vx = vx; this.vy = vy;
+    this.fuse = fuse;
+    this.r = 6;
+    this.t = 0;
+    this.alive = true;
+  }
+  update(dt, game) {
+    this.t += dt;
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.fuse -= dt;
+    if (this.y < -30 || this.y > 830 || this.x < -30 || this.x > 510) { this.alive = false; return; }
+    if (this.fuse <= 0 && game) {
+      this.alive = false;
+      const n = 5;
+      const spd = (95 + game.diff * 8) * game.bulletF;
+      const a0 = Math.random() * 6.3;
+      for (let i = 0; i < n; i++) {
+        const a = a0 + i * Math.PI * 2 / n;
+        game.enemyBullets.push(new EnemyBullet(this.x, this.y, Math.cos(a) * spd, Math.sin(a) * spd, false));
+      }
+      game.explosions.push(new BoomAnim(this.x, this.y, 1.8));
+      game.shocks.push(new Shockwave(this.x, this.y, 26, '255,150,90'));
+    }
+  }
+  draw(ctx) {
+    const blink = Math.sin(this.t * (this.fuse < 0.5 ? 40 : 14)) > 0;
+    ctx.fillStyle = '#2c3242';
+    ctx.beginPath(); ctx.arc(this.x, this.y, 6, 0, 6.3); ctx.fill();
+    ctx.fillStyle = blink ? '#ff5a3c' : '#7a2f18';
+    ctx.beginPath(); ctx.arc(this.x, this.y, 3, 0, 6.3); ctx.fill();
+  }
+}
+
 /* Bombe fliegt zum anvisierten Bodenziel */
 class Bomb {
-  constructor(x, y, tx, ty) {
+  constructor(x, y, tx, ty, staticTarget) {
     this.sx = x; this.sy = y;
     this.tx = tx; this.ty = ty;
+    this.staticTarget = !!staticTarget;   // z. B. Festungskern: scrollt nicht mit
     this.t = 0;
     this.dur = 0.36;
     this.alive = true;
@@ -210,7 +335,7 @@ class Bomb {
     const p = clamp(this.t / this.dur, 0, 1);
     this.x = this.sx + (this.tx - this.sx) * p;
     // Ziel wandert mit dem Scrolling nach unten
-    this.ty += game.scrollSpeed * dt;
+    if (!this.staticTarget) this.ty += game.scrollSpeed * dt;
     this.y = this.sy + (this.ty - this.sy) * p;
     if (p >= 1) {
       this.alive = false;
@@ -240,9 +365,14 @@ class Player {
     this.x = 240; this.y = 640;
     this.hitR = 7;                       // kleine faire Hitbox
     this.shield = 3; this.shieldMax = 3;
+    this.weapon = 'vulcan';              // 'vulcan' (Fächer) | 'laser' (Durchschlag)
     this.spread = 1;                     // 1..3 Fächerstufen
+    this.laserLvl = 1;                   // 1..3 Laserstufen
     this.rapid = 0;                      // 0..2 Feuerraten-Stufen
     this.drones = 0;                     // 0..2 Begleit-Drohnen
+    this.homing = 0;                     // 0..2 Zielsuchraketen-Werfer
+    this.homingTimer = 0;
+    this.homingSide = 1;
     this.megaBomb = false;               // größerer Bombenradius
     this.fireTimer = 0;
     this.bombTimer = 0;
@@ -253,7 +383,10 @@ class Player {
     this.t = 0;
   }
 
-  get fireInterval() { return 1 / (7 + this.rapid * 3.5); }
+  get fireInterval() {
+    if (this.weapon === 'laser') return 1 / (8 + this.rapid * 3 + (this.laserLvl >= 3 ? 2 : 0));
+    return 1 / (7 + this.rapid * 3.5);
+  }
   get reticleY() { return this.y - 165; }
   get bombRadius() { return this.megaBomb ? 64 : 46; }
 
@@ -285,18 +418,45 @@ class Player {
       this.shoot(game);
     }
     if (this.bombTimer > 0) this.bombTimer -= dt;
+
+    // Zielsuchraketen-Werfer
+    if (this.homing > 0) {
+      this.homingTimer -= dt;
+      if (this.homingTimer <= 0) {
+        this.homingTimer = 0.62;
+        for (let i = 0; i < this.homing; i++) {
+          this.homingSide *= -1;
+          game.playerBullets.push(new PlayerMissile(
+            this.x + this.homingSide * 16, this.y + 6, this.homingSide
+          ));
+        }
+        game.sound.sfx('missile');
+      }
+    }
   }
 
   shoot(game) {
     const B = game.playerBullets;
-    B.push(new PlayerBullet(this.x, this.y - 20, 0, -560));
-    if (this.spread >= 2) {
-      B.push(new PlayerBullet(this.x - 10, this.y - 12, -95, -540));
-      B.push(new PlayerBullet(this.x + 10, this.y - 12, 95, -540));
-    }
-    if (this.spread >= 3) {
-      B.push(new PlayerBullet(this.x - 14, this.y - 6, -195, -500));
-      B.push(new PlayerBullet(this.x + 14, this.y - 6, 195, -500));
+    if (this.weapon === 'laser') {
+      if (this.laserLvl === 1) {
+        B.push(new PlayerLaser(this.x, this.y - 24, 5));
+      } else {
+        const w = this.laserLvl >= 3 ? 7 : 5;
+        B.push(new PlayerLaser(this.x - 7, this.y - 22, w));
+        B.push(new PlayerLaser(this.x + 7, this.y - 22, w));
+      }
+      game.sound.sfx('laser');
+    } else {
+      B.push(new PlayerBullet(this.x, this.y - 20, 0, -560));
+      if (this.spread >= 2) {
+        B.push(new PlayerBullet(this.x - 10, this.y - 12, -95, -540));
+        B.push(new PlayerBullet(this.x + 10, this.y - 12, 95, -540));
+      }
+      if (this.spread >= 3) {
+        B.push(new PlayerBullet(this.x - 14, this.y - 6, -195, -500));
+        B.push(new PlayerBullet(this.x + 14, this.y - 6, 195, -500));
+      }
+      game.sound.sfx('shot');
     }
     for (let i = 0; i < this.drones; i++) {
       const off = i === 0 ? -34 : 34;
@@ -305,9 +465,8 @@ class Player {
     // Mündungsfeuer
     game.particles.push(new Particle(
       this.x, this.y - 22, rand(-8, 8), -60,
-      0.07, 5, '#cfeaff', true
+      0.07, 5, this.weapon === 'laser' ? '#9db8ff' : '#cfeaff', true
     ));
-    game.sound.sfx('shot');
   }
 
   draw(ctx) {
@@ -561,6 +720,142 @@ class Spinner extends AirEnemy {
   }
 }
 
+/* Panzerkäfer — zerfällt beim Tod in zwei Splitter */
+class Splitter extends AirEnemy {
+  constructor(x, diff) {
+    super(x, -26);
+    this.hp = 3 + Math.floor(diff * 0.4);
+    this.score = 150;
+    this.r = 15;
+    this.vx = (Math.random() < 0.5 ? -1 : 1) * 44;
+  }
+  hurt(dmg, game) {
+    const died = super.hurt(dmg, game);
+    if (died) {
+      for (const s of [-1, 1]) {
+        const f = new Fragment(this.x + s * 8, this.y, s * rand(80, 160), rand(60, 150));
+        game.airEnemies.push(f);
+      }
+    }
+    return died;
+  }
+  update(dt, game) {
+    this.baseUpdate(dt);
+    this.y += (86 + game.diff * 8) * dt;
+    this.x += this.vx * dt + Math.sin(this.t * 2) * 28 * dt;
+    if (this.x < 30 || this.x > 450) this.vx *= -1;
+  }
+  draw(ctx) {
+    this.sprite(ctx, SPRITES.splitter, Math.sin(this.t * 2.4) * 0.12);
+  }
+}
+
+/* Splitter-Fragment — klein und flink */
+class Fragment extends AirEnemy {
+  constructor(x, y, vx, vy) {
+    super(x, y);
+    this.hp = 1;
+    this.score = 40;
+    this.r = 8;
+    this.vx = vx; this.vy = vy;
+  }
+  update(dt, game) {
+    this.baseUpdate(dt);
+    this.vy += 90 * dt;
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+  }
+  draw(ctx) {
+    this.sprite(ctx, SPRITES.fragment, this.t * 9);
+  }
+}
+
+/* Minenleger — quert oben und wirft Schwebeminen ab */
+class Minelayer extends AirEnemy {
+  constructor(fromLeft, yBase, diff) {
+    super(fromLeft ? -36 : 516, yBase);
+    this.hp = 4 + Math.floor(diff * 0.5);
+    this.score = 220;
+    this.r = 17;
+    this.vx = (fromLeft ? 1 : -1) * (92 + diff * 6);
+    this.dropIn = 0.7;
+  }
+  update(dt, game) {
+    this.baseUpdate(dt);
+    this.x += this.vx * dt;
+    this.y += Math.sin(this.t * 1.6) * 18 * dt + 9 * dt;
+    this.dropIn -= dt;
+    if (this.dropIn <= 0 && this.x > 30 && this.x < 450) {
+      this.dropIn = rand(0.9, 1.4);
+      game.airEnemies.push(new Mine(this.x, this.y + 12));
+      game.sound.sfx('lock');
+    }
+  }
+  draw(ctx) {
+    this.sprite(ctx, SPRITES.minelayer, this.vx > 0 ? 0.05 : -0.05);
+  }
+}
+
+/* Schwebemine — treibt langsam nach unten */
+class Mine extends AirEnemy {
+  constructor(x, y) {
+    super(x, y);
+    this.hp = 1;
+    this.score = 30;
+    this.r = 10;
+  }
+  update(dt, game) {
+    this.baseUpdate(dt);
+    this.y += (42 + game.scrollSpeed * 0.25) * dt;
+    this.x += Math.sin(this.t * 1.8) * 22 * dt;
+  }
+  draw(ctx) {
+    this.sprite(ctx, SPRITES.mine, this.t * 1.3);
+    const gl = 0.4 + 0.6 * Math.abs(Math.sin(this.t * 5));
+    ctx.fillStyle = `rgba(255,80,60,${gl})`;
+    ctx.beginPath(); ctx.arc(this.x, this.y, 2.5, 0, 6.3); ctx.fill();
+  }
+}
+
+/* Zielsuchrakete aus dem Bodensilo */
+class HomingMissile extends AirEnemy {
+  constructor(x, y, diff, game) {
+    super(x, y);
+    this.hp = 1;
+    this.score = 80;
+    this.r = 9;
+    this.speed = (115 + diff * 16) * game.bulletF;
+    this.homeT = 2.8;
+    const p = game.player;
+    this.a = p.alive ? Math.atan2(p.y - y, p.x - x) : -Math.PI / 2;
+  }
+  update(dt, game) {
+    this.baseUpdate(dt);
+    this.homeT -= dt;
+    const p = game.player;
+    if (this.homeT > 0 && p.alive) {
+      const want = Math.atan2(p.y - this.y, p.x - this.x);
+      let dA = want - this.a;
+      while (dA > Math.PI) dA -= Math.PI * 2;
+      while (dA < -Math.PI) dA += Math.PI * 2;
+      this.a += clamp(dA, -2.6 * dt, 2.6 * dt);
+    }
+    this.x += Math.cos(this.a) * this.speed * dt;
+    this.y += Math.sin(this.a) * this.speed * dt;
+    if (Math.random() < dt * 30) {
+      game.particles.push(new Particle(
+        this.x, this.y, rand(-10, 10), rand(-10, 10),
+        rand(0.2, 0.45), rand(1.5, 3), 'rgba(120,120,130,0.5)', false
+      ));
+    }
+  }
+  draw(ctx) {
+    ctx.fillStyle = 'rgba(255,90,60,0.25)';
+    ctx.beginPath(); ctx.arc(this.x, this.y, 10, 0, 6.3); ctx.fill();
+    this.sprite(ctx, SPRITES.missile, this.a + Math.PI / 2);
+  }
+}
+
 /* ============================================================
    BODENGEGNER — nur mit Bomben zerstörbar (wie beim Vorbild)
    ============================================================ */
@@ -578,6 +873,8 @@ class GroundEnemy {
       case 'turret': this.r = 16; this.hp = 1; this.score = 300; this.fireIn = rand(1.2, 2.6); break;
       case 'tank':   this.r = 15; this.hp = 1; this.score = 250; this.fireIn = rand(1.5, 2.8); this.dir = Math.random() < 0.5 ? -1 : 1; break;
       case 'radar':  this.r = 15; this.hp = 1; this.score = 500; break;
+      case 'silo':   this.r = 16; this.hp = 1; this.score = 400; this.fireIn = rand(2.2, 3.6); this.hatch = 0; break;
+      case 'flak':   this.r = 16; this.hp = 1; this.score = 350; this.fireIn = rand(1.8, 3.0); break;
     }
   }
   hurt(dmg, game) {
@@ -600,6 +897,28 @@ class GroundEnemy {
       return;
     }
     const p = game.player;
+    if (this.type === 'silo') {
+      if (this.hatch > 0) this.hatch -= dt;
+      this.fireIn -= dt;
+      if (this.fireIn <= 0 && this.y > 40 && this.y < 600 && p.alive) {
+        this.fireIn = rand(3.4, 5.0) / (0.8 + game.diff * 0.06);
+        this.hatch = 0.8;
+        game.airEnemies.push(new HomingMissile(this.x, this.y - 6, game.diff, game));
+        game.sound.sfx('bomb');
+      }
+    } else if (this.type === 'flak') {
+      this.fireIn -= dt;
+      if (this.fireIn <= 0 && this.y > 40 && this.y < 620 && p.alive) {
+        this.fireIn = rand(2.4, 3.6) / (0.75 + game.diff * 0.08);
+        const a = Math.atan2(p.y - this.y, p.x - this.x);
+        const spd = (135 + game.diff * 10) * game.bulletF;
+        const dist = Math.hypot(p.x - this.x, p.y - this.y);
+        game.enemyBullets.push(new FlakShell(
+          this.x, this.y, Math.cos(a) * spd, Math.sin(a) * spd,
+          Math.max(0.4, dist / spd * 0.72)
+        ));
+      }
+    }
     if (this.type === 'turret' || this.type === 'tank') {
       const want = Math.atan2(p.y - this.y, p.x - this.x);
       let dA = want - this.aim;
@@ -674,6 +993,22 @@ class GroundEnemy {
         ctx.beginPath(); ctx.arc(this.x, this.y, 4.5, 0, 6.3); ctx.fill();
         break;
       }
+      case 'silo': {
+        drawSprite(ctx, SPRITES.silo, this.x, this.y, { flash: fl });
+        if (this.hatch > 0) {
+          // geöffnete Luke glüht
+          ctx.fillStyle = `rgba(255,160,60,${Math.min(0.85, this.hatch)})`;
+          ctx.fillRect(this.x - 5, this.y - 7, 10, 12);
+        }
+        break;
+      }
+      case 'flak': {
+        drawSprite(ctx, SPRITES.flak, this.x, this.y, { flash: fl });
+        const gl = 0.4 + 0.6 * Math.abs(Math.sin(this.t * 3));
+        ctx.fillStyle = `rgba(255,200,90,${gl * 0.7})`;
+        ctx.beginPath(); ctx.arc(this.x, this.y, 3, 0, 6.3); ctx.fill();
+        break;
+      }
       case 'radar': {
         drawSprite(ctx, SPRITES.radarBase, this.x, this.y, { flash: fl });
         ctx.save();
@@ -703,6 +1038,7 @@ class GroundEnemy {
 
 class Boss {
   constructor(stage) {
+    this.kind = 'mothership';
     this.stage = stage;
     this.x = 240; this.y = -120;
     this.t = 0;
@@ -782,11 +1118,12 @@ class Boss {
 
   /* Rückgabe: true wenn Treffer verarbeitet */
   hitTest(b, game) {
+    const dmg = b.dmg || 1;
     // Türme
     for (const pod of this.pods) {
       if (!pod.alive) continue;
       if (dist2(b.x, b.y, this.x + pod.off, this.podY) < 18 * 18) {
-        pod.hp -= 1;
+        pod.hp -= dmg;
         pod.flash = 0.08;
         if (pod.hp <= 0) {
           pod.alive = false;
@@ -802,7 +1139,7 @@ class Boss {
     }
     // Kern
     if (this.coreExposed && dist2(b.x, b.y, this.x, this.coreY) < 24 * 24) {
-      this.coreHp -= 1;
+      this.coreHp -= dmg;
       this.coreFlash = 0.07;
       if (this.coreHp <= 0 && this.dying <= 0) {
         this.dying = 2.2;
@@ -888,11 +1225,242 @@ class Boss {
 }
 
 /* ============================================================
+   FESTUNGS-BOSS — Kern nur mit Bomben verwundbar!
+   Ab Stufe 2 im Wechsel mit dem Mutterschiff.
+   ============================================================ */
+
+class Fortress {
+  constructor(stage) {
+    this.kind = 'fortress';
+    this.stage = stage;
+    this.x = 240; this.y = -140;
+    this.t = 0;
+    this.alive = true;
+    this.entering = true;
+    this.w = 185; this.h = 88;
+    this.pods = [-64, 64].map(off => ({
+      off, hp: 10 + stage * 2, maxHp: 10 + stage * 2, alive: true, flash: 0, fireIn: rand(1.2, 2.4),
+    }));
+    this.coreHp = 24 + stage * 8;
+    this.coreMax = this.coreHp;
+    this.coreFlash = 0;
+    this.coreOpen = false;
+    this.coreTimer = 3.0;
+    this.gunTimer = 2.0;
+    this.spiralT = 0;
+    this.spiralA = 0;
+    this.score = 6000 + (stage - 1) * 1500;
+    this.dying = 0;
+  }
+
+  get coreY() { return this.y + 24; }
+  get bombable() { return this.coreOpen && !this.entering && this.dying <= 0; }
+
+  update(dt, game) {
+    this.t += dt;
+    if (this.dying > 0) {
+      this.dying -= dt;
+      if (Math.random() < dt * 24) {
+        const ex = this.x + rand(-85, 85), ey = this.y + rand(-30, 45);
+        spawnExplosion(game, ex, ey, { count: 10 });
+        game.explosions.push(new BoomAnim(ex, ey, rand(2, 3.4)));
+        game.sound.sfx('expl');
+      }
+      if (this.dying <= 0) {
+        this.alive = false;
+        game.onBossDefeated(this);
+      }
+      return;
+    }
+
+    if (this.entering) {
+      this.y += (150 - this.y) * Math.min(1, 1.5 * dt);
+      if (this.y > 146) this.entering = false;
+      return;
+    }
+
+    this.x = 240 + Math.sin(this.t * 0.42) * 100;
+    this.y = 150 + Math.sin(this.t * 0.9) * 7;
+
+    const p = game.player;
+
+    // Kern-Zyklus: zu → offen → zu ...
+    this.coreTimer -= dt;
+    if (this.coreTimer <= 0) {
+      this.coreOpen = !this.coreOpen;
+      this.coreTimer = this.coreOpen ? 2.8 : 3.2;
+      if (this.coreOpen) game.sound.sfx('lock');
+    }
+
+    // Türme feuern gezielt
+    for (const pod of this.pods) {
+      if (!pod.alive) continue;
+      if (pod.flash > 0) pod.flash -= dt;
+      pod.fireIn -= dt;
+      if (pod.fireIn <= 0 && p.alive) {
+        pod.fireIn = rand(1.5, 2.6) / (0.8 + game.diff * 0.06);
+        const px = this.x + pod.off, py = this.y + 30;
+        const a = Math.atan2(p.y - py, p.x - px);
+        const spd = (155 + game.diff * 13) * game.bulletF;
+        game.enemyBullets.push(new EnemyBullet(px, py, Math.cos(a) * spd, Math.sin(a) * spd, false));
+      }
+    }
+    if (this.coreFlash > 0) this.coreFlash -= dt;
+
+    // Hüllengeschütze: Doppelsalven
+    this.gunTimer -= dt;
+    if (this.gunTimer <= 0 && p.alive) {
+      this.gunTimer = 2.6 / (0.8 + game.diff * 0.07);
+      for (const gx of [-28, 28]) {
+        const a = Math.atan2(p.y - (this.y + 36), p.x - (this.x + gx));
+        const spd = (120 + game.diff * 10) * game.bulletF;
+        game.enemyBullets.push(new EnemyBullet(this.x + gx, this.y + 36, Math.cos(a) * spd, Math.sin(a) * spd, true));
+      }
+    }
+
+    // offener Kern: rotierende Spirale
+    if (this.coreOpen && p.alive) {
+      this.spiralT -= dt;
+      if (this.spiralT <= 0) {
+        this.spiralT = 0.17;
+        this.spiralA += 0.9;
+        const spd = (110 + game.diff * 9) * game.bulletF;
+        for (const s of [0, Math.PI]) {
+          game.enemyBullets.push(new EnemyBullet(
+            this.x, this.coreY,
+            Math.cos(this.spiralA + s) * spd,
+            Math.abs(Math.sin(this.spiralA + s)) * spd * 0.7 + 30, false
+          ));
+        }
+      }
+    }
+  }
+
+  /* Schüsse: Türme verwundbar, Kern liegt tief — nur Bomben! */
+  hitTest(b, game) {
+    const dmg = b.dmg || 1;
+    for (const pod of this.pods) {
+      if (!pod.alive) continue;
+      if (dist2(b.x, b.y, this.x + pod.off, this.y + 30) < 17 * 17) {
+        pod.hp -= dmg;
+        pod.flash = 0.08;
+        if (pod.hp <= 0) {
+          pod.alive = false;
+          spawnExplosion(game, this.x + pod.off, this.y + 30, { count: 16 });
+          game.explosions.push(new BoomAnim(this.x + pod.off, this.y + 30, 2.6));
+          game.shocks.push(new Shockwave(this.x + pod.off, this.y + 30, 40));
+          game.sound.sfx('expl');
+          game.addScore(game.pts(500), this.x + pod.off, this.y + 30);
+        }
+        return true;
+      }
+    }
+    // Rumpf blockt alles — Funkenflug am Kernschacht
+    if (Math.abs(b.x - this.x) < this.w / 2 && Math.abs(b.y - this.y) < this.h / 2) {
+      if (dist2(b.x, b.y, this.x, this.coreY) < 26 * 26 && Math.random() < 0.4) {
+        game.particles.push(new Particle(b.x, b.y, rand(-60, 60), rand(-80, -20),
+          rand(0.1, 0.25), rand(1.5, 3), '#cfd8ea', true));
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /* Bombentreffer auf den offenen Kern */
+  bombHit(x, y, r, game) {
+    if (!this.bombable) return false;
+    if (dist2(x, y, this.x, this.coreY) > (r + 22) * (r + 22)) return false;
+    this.coreHp -= 5;
+    this.coreFlash = 0.1;
+    spawnExplosion(game, this.x, this.coreY, { count: 18 });
+    game.shocks.push(new Shockwave(this.x, this.coreY, 60, '255,180,90'));
+    if (this.coreHp <= 0 && this.dying <= 0) {
+      this.dying = 2.2;
+      game.sound.sfx('gexpl');
+      game.shake(14, 1.2);
+    }
+    return true;
+  }
+
+  bodyHit(px, py, pr) {
+    return Math.abs(px - this.x) < this.w / 2 + pr - 8 && Math.abs(py - this.y) < this.h / 2 + pr - 8;
+  }
+
+  draw(ctx) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+
+    drawSprite(ctx, SPRITES.fortress, 0, 0, { scale: 3 });
+
+    // Türme
+    for (const pod of this.pods) {
+      if (!pod.alive) {
+        drawSprite(ctx, SPRITES.bossPodDead, pod.off, 30);
+        continue;
+      }
+      drawSprite(ctx, SPRITES.fortressPod, pod.off, 30, { flash: pod.flash > 0 ? pod.flash + 0.04 : 0 });
+      const hpF = pod.hp / pod.maxHp;
+      ctx.fillStyle = '#141822';
+      ctx.fillRect(pod.off - 12, 44, 24, 3);
+      ctx.fillStyle = '#c6e06a';
+      ctx.fillRect(pod.off - 12, 44, 24 * hpF, 3);
+    }
+
+    // Kernschacht
+    const pulse = 0.5 + 0.5 * Math.sin(this.t * 7);
+    if (this.coreFlash > 0) { ctx.shadowColor = '#fff'; ctx.shadowBlur = 16; }
+    if (this.coreOpen && !this.entering) {
+      ctx.fillStyle = '#1a1008';
+      ctx.beginPath(); ctx.arc(0, 24, 19, 0, 6.3); ctx.fill();
+      ctx.fillStyle = `rgba(255,${110 + pulse * 70},50,1)`;
+      ctx.beginPath(); ctx.arc(0, 24, 14, 0, 6.3); ctx.fill();
+      ctx.fillStyle = `rgba(255,235,180,${0.5 + 0.5 * pulse})`;
+      ctx.beginPath(); ctx.arc(0, 24, 6 + pulse * 3, 0, 6.3); ctx.fill();
+      // Hinweisring: jetzt bombardieren!
+      ctx.strokeStyle = `rgba(255,200,90,${0.4 + 0.4 * pulse})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 24, 24 + pulse * 3, 0, 6.3); ctx.stroke();
+      ctx.lineWidth = 1;
+    } else {
+      // geschlossene Panzerluke
+      ctx.fillStyle = '#262d3b';
+      ctx.beginPath(); ctx.arc(0, 24, 18, 0, 6.3); ctx.fill();
+      ctx.strokeStyle = '#10141f';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-18, 24); ctx.lineTo(18, 24);
+      ctx.moveTo(0, 6); ctx.lineTo(0, 42);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(140,160,200,0.3)';
+      ctx.beginPath(); ctx.arc(0, 24, 18, 0, 6.3); ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+    ctx.shadowBlur = 0;
+
+    ctx.restore();
+  }
+
+  drawHpBar(ctx) {
+    const total = this.coreMax + this.pods.reduce((s, p) => s + p.maxHp, 0);
+    const cur = Math.max(0, this.coreHp) + this.pods.reduce((s, p) => s + Math.max(0, p.hp), 0);
+    const f = cur / total;
+    ctx.fillStyle = 'rgba(10,14,24,0.7)';
+    ctx.fillRect(90, 34, 300, 8);
+    ctx.fillStyle = f > 0.4 ? '#c6e06a' : '#ffdd57';
+    ctx.fillRect(91, 35, 298 * f, 6);
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.strokeRect(90.5, 34.5, 299, 7);
+  }
+}
+
+/* ============================================================
    POWER-UPS
    ============================================================ */
 
 const POWERUP_DEFS = {
   S:  { color: '#46c8ff', label: 'S',   name: 'Fächerfeuer +' },
+  L:  { color: '#5c8dff', label: 'L',   name: 'Laser +' },
+  H:  { color: '#ff8f4d', label: 'H',   name: 'Zielsuchraketen' },
   R:  { color: '#ffd166', label: 'R',   name: 'Feuerrate +' },
   E:  { color: '#7bed9f', label: 'E',   name: 'Schild voll' },
   D:  { color: '#c9a0ff', label: 'D',   name: 'Drohne' },
@@ -929,7 +1497,7 @@ class PowerUp {
     ctx.beginPath(); ctx.arc(0, 0, 20 * pulse, 0, 6.3); ctx.fill();
     // Gradius-artige Pixel-Kapsel
     drawSprite(ctx, SPRITES.capsule, 0, 0, { rot: Math.sin(this.t * 3) * 0.15 });
-    ctx.fillStyle = this.type === 'E' || this.type === 'D' ? def.color : '#7a2f10';
+    ctx.fillStyle = ['E', 'D', 'L'].includes(this.type) ? def.color : '#7a2f10';
     ctx.font = `bold ${this.type === 'U' ? 8 : 12}px 'Segoe UI', sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

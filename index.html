@@ -32,6 +32,10 @@
         <button class="seg" data-diff="normal">Normal</button>
         <button class="seg" data-diff="hard">Schwer</button>
       </div>
+      <div class="seg-row" id="modeRow" role="group" aria-label="Spielmodus">
+        <button class="seg" data-mode="campaign">Missionen</button>
+        <button class="seg" data-mode="endless">&#8734; Endlos</button>
+      </div>
       <button id="btnScores">&#127942;&nbsp; Bestenliste</button>
       <button id="btnOptions">&#9881;&nbsp; Optionen</button>
       <button id="btnHelp">&#10067;&nbsp; So wird gespielt</button>
@@ -82,7 +86,10 @@
         <li><b>Bomben:</b> Bodenziele werden automatisch bombardiert, sobald sie ins Fadenkreuz vor dem Schiff geraten.</li>
         <li><b>Kette:</b> Bodenziele ohne Fehlwurf treffen &ndash; der Multiplikator steigt bis &times;8!</li>
         <li><b>Schild:</b> H&auml;lt 3 Treffer aus. Bei Kollision oder Treffer verlierst du eine Schildzelle, nicht sofort ein Leben.</li>
-        <li><b>Power-ups:</b> <span class="pw">S</span> F&auml;cherfeuer &middot; <span class="pw">R</span> Feuerrate &middot; <span class="pw">E</span> Schild &middot; <span class="pw">D</span> Drohne &middot; <span class="pw">B</span> Mega-Bombe &middot; <span class="pw">1UP</span> Extraleben</li>
+        <li><b>Waffen:</b> <span class="pw">S</span> F&auml;cherfeuer und <span class="pw">L</span> Laser (durchschl&auml;gt Gegner) wechseln das Waffensystem &ndash; erneut einsammeln verst&auml;rkt es. <span class="pw">H</span> r&uuml;stet Zielsuchraketen nach.</li>
+        <li><b>Weitere Power-ups:</b> <span class="pw">R</span> Feuerrate &middot; <span class="pw">E</span> Schild &middot; <span class="pw">D</span> Drohne &middot; <span class="pw">B</span> Mega-Bombe &middot; <span class="pw">1UP</span> Extraleben</li>
+        <li><b>Bosse:</b> Beim Mutterschiff erst die T&uuml;rme, dann den Kern zerst&ouml;ren. Bei der Bodenfestung &ouml;ffnet sich der Kern periodisch &ndash; er ist <b>nur mit Bomben</b> verwundbar!</li>
+        <li><b>Endlos-Modus:</b> keine Bosse, daf&uuml;r endlos steigende Wellen &ndash; wie lange h&auml;ltst du durch?</li>
         <li><b>Extraleben</b> gibt es au&szlig;erdem ab 30.000 Punkten, danach alle 50.000.</li>
         <li><b>Desktop:</b> Pfeiltasten/WASD bewegen, P = Pause.</li>
       </ul>
@@ -127,7 +134,7 @@
     </div>
   </div>
 
-  <div class="footer-note" id="footerNote">v1.2 &middot; l&auml;uft offline &middot; zum Homescreen hinzuf&uuml;gen f&uuml;r Vollbild</div>
+  <div class="footer-note" id="footerNote">v1.3 &middot; l&auml;uft offline &middot; zum Homescreen hinzuf&uuml;gen f&uuml;r Vollbild</div>
 
   <div id="quitHint" class="toast hidden">Danke f&uuml;rs Spielen! Du kannst die App jetzt schlie&szlig;en.</div>
 

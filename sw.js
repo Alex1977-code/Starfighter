@@ -1,5 +1,5 @@
 /* Starfighter — Service Worker: macht das Spiel offline spielbar */
-const CACHE = 'starfighter-v3';
+const CACHE = 'starfighter-v4';
 const ASSETS = [
   '.',
   'index.html',

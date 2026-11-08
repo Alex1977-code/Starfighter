@@ -167,6 +167,11 @@ button.quit {
   border-color: rgba(255, 170, 160, 0.55);
 }
 
+.seg.active[data-mode="endless"] {
+  background: linear-gradient(180deg, #7a4fd8, #4a2a99);
+  border-color: rgba(200, 160, 255, 0.6);
+}
+
 /* ---------- Toast ---------- */
 
 .toast {
